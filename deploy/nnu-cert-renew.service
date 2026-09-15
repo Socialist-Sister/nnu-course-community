@@ -1,0 +1,6 @@
+[Unit]
+Description=Renew NNU HTTPS certificate
+After=network-online.target
+[Service]
+Type=oneshot
+ExecStart=/opt/certbot/bin/certbot renew --quiet --deploy-hook "/usr/sbin/nginx -t && /bin/systemctl reload nginx"

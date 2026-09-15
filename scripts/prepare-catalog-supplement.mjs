@@ -1,0 +1,11 @@
+import {readFileSync,writeFileSync} from 'node:fs';
+import {createHash} from 'node:crypto';
+const folder='../course-data/2026-autumn-recheck-20260914-104839';
+const raw=readFileSync(`${folder}/verified-pages.json`);
+const pages=JSON.parse(raw),report=JSON.parse(readFileSync(`${folder}/comparison-report.json`));
+if(report.current.errors.length)throw Error('Capture has errors');
+const codes=new Set(report.difference.newCourses.map(c=>c.code));
+const rows=pages.flatMap(p=>p.rows.map((row,i)=>({row,page:p.page,position:i+1}))).filter(x=>codes.has(x.row[0]));
+const data={id:'20260914-additions',semester:'2026-2027-1',capturedAt:report.checkedAt,sourceUrl:'https://xsxk.nnu.edu.cn/',sourceHash:createHash('sha256').update(raw).digest('hex'),courseCount:codes.size,rows};
+writeFileSync('server/data/catalog-supplement-20260914.json',JSON.stringify(data,null,2));
+console.log({courses:codes.size,offerings:rows.length});

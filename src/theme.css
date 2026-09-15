@@ -1,0 +1,20 @@
+/* NNU website green, observed in https://www.nnu.edu.cn/home/css/style.css.
+   Shared palette for all current and future pages; layout stays unchanged. */
+:root{
+  --brand:#217050;
+  --brand-dark:#18543c;
+  --text:#25382d;
+  --text-secondary:#52675a;
+  --muted:#6d7d73;
+  --tint:#eaf3ed;
+  --surface:#f5f9f6;
+  --surface-subtle:#fbfdfb;
+  --line:#dce6df;
+  --control-border:#bed0c3;
+  --border-strong:#93b5a0;
+  --focus-border:#6a9b7e;
+  --focus-tint:#21705012;
+  --shadow-soft:#193d290a;
+  --shadow-dialog:#193d2930;
+  --overlay:#172c2055;
+}

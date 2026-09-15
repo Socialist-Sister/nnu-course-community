@@ -1,0 +1,22 @@
+.wrapping-select{display:inline-flex;flex-direction:column;align-items:stretch;flex:1;min-width:0;width:100%;position:relative;vertical-align:middle}
+.category-select-trigger{display:flex;align-items:center;gap:8px;width:100%;min-width:0;min-height:40px;padding:8px 11px;border:1px solid var(--control-border);border-radius:6px;background:#fff;color:var(--text-secondary);font:inherit;font-size:13px;text-align:left}
+.category-select-trigger>span{flex:1;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.category-select-trigger>svg{flex-shrink:0;color:var(--muted)}
+.category-select-trigger[aria-expanded="true"],.category-select-trigger:focus-visible{border-color:var(--focus-border);box-shadow:none}
+.category-select-trigger:disabled{cursor:not-allowed;opacity:.6}
+.category-select-trigger[aria-invalid="true"]{border-color:#ad403b}
+.category-select-menu{position:fixed;inset:auto;margin:0;z-index:100;box-sizing:border-box;display:flex;flex-direction:column;overflow:hidden;padding:0;border:1px solid var(--control-border);border-radius:8px;background:#fff;color:var(--text-secondary);box-shadow:0 6px 22px var(--shadow-soft);font-size:13px;line-height:1.65}
+.category-select-scroll{min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:4px}
+.category-select-heading{padding:9px 8px 4px;font-size:12px;font-weight:600;color:var(--muted)}
+.category-select-option{display:flex;align-items:center;gap:6px;min-height:38px;padding:8px;border-radius:4px;cursor:pointer}
+.category-select-option>span{flex:1;min-width:0;white-space:normal;overflow-wrap:anywhere}
+.category-select-option>svg{flex-shrink:0;color:var(--brand)}
+.category-select-option:hover,.category-select-option.is-active{background:var(--surface)}
+.category-select-option[aria-selected="true"]{color:var(--brand);background:var(--tint)}
+.category-select-option[aria-disabled="true"]{opacity:.5;cursor:not-allowed}
+.wrapping-select>select.dropdown-validity{position:absolute!important;width:1px!important;height:1px!important;min-height:0!important;padding:0!important;border:0!important;opacity:0;clip-path:inset(50%);pointer-events:none}
+.dropdown-error{font-size:12px;color:#ad403b;margin-top:4px}
+.review-form .category-select-trigger,.community-form .category-select-trigger{min-height:44px;font:inherit;padding:10px 12px}
+.community-toolbar .wrapping-select{width:150px;flex:none}
+.select-wrap:has(>.wrapping-select)>svg{display:none}
+@media(max-width:760px){.category-select-option{min-height:44px}}

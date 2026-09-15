@@ -1,0 +1,112 @@
+import {test,before,after} from 'node:test';
+import assert from 'node:assert/strict';
+import {mkdtempSync,readFileSync,rmSync} from 'node:fs';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+import {openDatabase} from '../server/database.mjs';
+import {importCatalog,readCatalog} from '../server/import-catalog.mjs';
+import {createApp} from '../server/index.mjs';
+import {courseDetail,listCourses} from '../server/catalog.mjs';
+import {currentPerson,ensureAdminSetup} from '../server/accounts.mjs';
+import {writeReview} from '../server/reviews.mjs';
+import {syncCoursePages} from '../server/taxonomy.mjs';
+import {testMailbox,emailProof} from './mail-fixture.mjs';
+const mailbox=testMailbox();
+let db,server,url,dir,admin,member,second,reviewId,reportId;
+const password='A-test-password-123456';
+const review=()=>({courseId:'1000000015',groupId:courseDetail(db,'1000000015').groups[0].sourceGroupIds[0],rating:4,difficulty:2,workload:3,grading:4,gain:5,content:'独立账号后台测试'});
+async function call(client,path,method='GET',data,headers={}){
+  const response=await fetch(url+path,{method,headers:{Cookie:client?.cookie||'','X-CSRF-Token':client?.csrf||'','Content-Type':'application/json',...headers},...(data===undefined?{}:{body:JSON.stringify(data)})});
+  const result=await response.json();const cookie=response.headers.get('set-cookie');
+  if(client&&cookie)client.cookie=cookie.split(';')[0];if(client&&result.csrf)client.csrf=result.csrf;
+  return {status:response.status,data:result};
+}
+async function guest(){const c={};assert.equal((await call(c,'/api/session')).status,200);return c;}
+async function register(name){const c=await guest();const proof=await emailProof(call,c,mailbox,name+'@njnu.edu.cn');const r=await call(c,'/api/account/register','POST',{username:name,password,...proof});assert.equal(r.status,200);c.account=r.data.account;return c;}
+before(async()=>{dir=mkdtempSync(join(tmpdir(),'nnu-account-test-'));db=openDatabase(join(dir,'catalog.sqlite'));importCatalog(db,readCatalog());ensureAdminSetup(db,join(dir,'setup.txt'));server=createApp(db,{mailer:mailbox});await new Promise(r=>server.listen(0,'127.0.0.1',r));url=`http://127.0.0.1:${server.address().port}`;});
+after(async()=>{await new Promise(r=>server.close(r));db.close();rmSync(dir,{recursive:true,force:true});});
+test('账号注册、角色不可伪造、CSRF 与管理员初始化权限',async()=>{
+  const g=await guest();assert.equal((await call(g,'/api/reviews','POST',review())).status,401);
+  assert.equal((await call(g,'/api/account/register','POST',{username:'admin_test',password},{'X-CSRF-Token':'wrong'})).status,403);
+  assert.equal((await call(g,'/api/account/register','POST',{username:'admin_test',password},{Origin:'https://evil.example'})).status,403);
+  admin=await register('admin_test');member=await register('member_test');
+  assert.equal((await call(member,'/api/admin/reviews')).status,403);
+  assert.equal((await call(admin,'/api/admin/setup','POST',{code:'wrong'})).status,403);
+  const setup=readFileSync(join(dir,'setup.txt'),'utf8').trim();assert.equal((await call(admin,'/api/admin/setup','POST',{code:setup})).status,200);
+  assert.equal((await call(member,'/api/admin/setup','POST',{code:setup})).status,409);
+  assert.equal((await call(admin,'/api/admin/overview')).status,200);
+  assert.equal((await call(member,'/api/account/register','POST',{username:'fake_admin',password,role:'admin'})).status,409);
+  const forged=await guest();const proof=await emailProof(call,forged,mailbox,'fake_admin@njnu.edu.cn');const r=await call(forged,'/api/account/register','POST',{username:'fake_admin',password,role:'admin',...proof});assert.equal(r.data.account.role,'member');
+  const row=db.prepare('SELECT * FROM accounts WHERE username=?').get('member_test');assert.notEqual(row.password_hash,password);assert.notEqual(row.recovery_hash,member.recoveryCode);
+});
+test('会话轮换、跨设备登录、旧浏览器评价关联不丢失，访客凭证被撤销',async()=>{
+  const legacy=await guest(),oldCookie=legacy.cookie,person=currentPerson(db,{headers:{cookie:oldCookie}});
+  const old=writeReview(db,person,review());
+  const response=await call(legacy,'/api/account/login','POST',{username:'member_test',password});assert.equal(response.status,200);assert.equal(response.data.claimed,1);assert.notEqual(legacy.cookie,oldCookie);
+  assert.equal(currentPerson(db,{headers:{cookie:oldCookie}}),null);
+  const mine=await call(member,'/api/my/reviews');assert.ok(mine.data.items.some(r=>r.id===old.id));reviewId=old.id;
+  assert.equal((await call(member,'/api/reviews','POST',review())).status,200);
+  assert.equal((await call(member,'/api/reviews','POST',{...review(),content:'不同内容'})).status,409);
+  const publicRows=(await call(null,'/api/courses/1000000015/reviews')).data.items;
+  assert.equal(publicRows.find(r=>r.id===reviewId).isMine,false);assert.ok(publicRows.every(r=>r.userId===undefined&&r.username===undefined));
+  second=await guest();assert.equal((await call(second,'/api/account/login','POST',{username:'MEMBER_TEST',password})).status,200);
+  assert.ok((await call(second,'/api/my/reviews')).data.items.some(r=>r.id===reviewId));
+});
+test('举报去重、普通账号不能管理、下架阻止重发，恢复不公开作者撤回内容',async()=>{
+  assert.equal((await call(member,`/api/reviews/${reviewId}/report`,'POST',{reason:'test'})).status,400);
+  const reported=await call(admin,`/api/reviews/${reviewId}/report`,'POST',{reason:'测试举报'});assert.equal(reported.status,201);reportId=reported.data.id;
+  assert.equal((await call(admin,`/api/reviews/${reviewId}/report`,'POST',{reason:'再次举报'})).data.id,reportId);
+  assert.equal((await call(member,`/api/admin/reviews/${reviewId}`,'POST',{action:'block',reason:'越权'})).status,403);
+  assert.equal((await call(admin,`/api/admin/reviews/${reviewId}`,'POST',{action:'block',reason:'测试下架'})).status,200);
+  assert.equal(courseDetail(db,'1000000015').reviewCount,0);
+  assert.equal((await call(null,'/api/courses/1000000015/reviews')).data.total,0);
+  assert.equal((await call(member,`/api/reviews/${reviewId}`,'PUT',review())).status,403);
+  assert.equal((await call(member,'/api/my/reviews')).data.items.find(r=>r.id===reviewId).moderationReason,'测试下架');
+  await call(member,`/api/reviews/${reviewId}`,'DELETE');await call(admin,`/api/admin/reviews/${reviewId}`,'POST',{action:'restore',reason:'复核通过'});
+  assert.equal(db.prepare('SELECT status FROM reviews WHERE id=?').get(reviewId).status,'hidden');assert.equal(courseDetail(db,'1000000015').reviewCount,0);
+  assert.equal((await call(member,`/api/reviews/${reviewId}`,'PUT',review())).status,200);
+  assert.equal((await call(admin,`/api/admin/reports/${reportId}`,'POST',{status:'resolved',resolution:'复核完成'})).status,200);
+  assert.equal((await call(admin,'/api/admin/reports?status=resolved')).data.items[0].id,reportId);
+});
+test('课程分类与教师修订可搜索、保留原始来源，重新导入不会覆盖后台修订',async()=>{
+  const detail=(await call(admin,'/api/admin/courses/1000000015')).data,original=detail.original;
+  const change={name:'课程后台校验',department:original.department,categoryIds:['liberal-arts'],seriesMode:'auto',groups:detail.groups.map(g=>({id:g.id,teacher:'资料核验教师'})),reason:'独立测试修改'};
+  assert.equal((await call(member,'/api/admin/courses/1000000015','POST',change)).status,403);
+  assert.equal((await call(admin,'/api/admin/courses/1000000015','POST',change)).status,200);
+  assert.equal(listCourses(db,new URLSearchParams({q:'资料核验教师',topic:'liberal-arts'})).total,1);
+  assert.equal(courseDetail(db,'1000000015').name,'课程后台校验');assert.equal(courseDetail(db,'1000000015').reviewCount,1);
+  assert.deepEqual({...db.prepare('SELECT * FROM courses WHERE code=?').get(original.code)},{...original});
+  importCatalog(db,readCatalog());assert.equal(courseDetail(db,'1000000015').name,'课程后台校验');
+  assert.equal((await call(admin,'/api/admin/courses/1000000015','POST',{...change,groups:[{id:'wrong',teacher:'wrong'}]})).status,400);
+  assert.equal(courseDetail(db,'1000000015').groups[0].teacher,'资料核验教师');
+  assert.equal((await call(admin,'/api/admin/courses/1000000015','POST',{reset:true})).status,200);
+  assert.equal(courseDetail(db,'1000000015').name,original.name);assert.equal(courseDetail(db,'1000000015').reviewCount,1);
+});
+test('上下册可独立及重新归并，事务完整，管理员记录可追溯',async()=>{
+  const course=db.prepare("SELECT * FROM courses WHERE name LIKE '高等数学%(上)' LIMIT 1").get();assert.ok(course);
+  const previous=courseDetail(db,course.code);assert.equal(previous.isSeries,true);
+  const data={name:course.name,department:course.department,categoryIds:null,seriesMode:'separate',groups:[],reason:'检查独立页面'};
+  assert.equal((await call(admin,'/api/admin/courses/'+course.code,'POST',data)).status,200);assert.equal(courseDetail(db,course.code).isSeries,false);
+  assert.ok(courseDetail(db,previous.code).courseCodes.includes(course.code));
+  syncCoursePages(db);assert.equal(courseDetail(db,course.code).isSeries,false);
+  await call(admin,'/api/admin/courses/'+course.code,'POST',{...data,seriesMode:'auto'});assert.equal(courseDetail(db,course.code).code,previous.code);
+  assert.ok((await call(admin,'/api/admin/audit')).data.items.some(r=>r.action==='course.update'));
+  assert.deepEqual(db.prepare('PRAGMA foreign_key_check').all(),[]);
+});
+test('邮箱重置密码：验证码只能用一次，旧设备全部退出，评价保持',async()=>{
+  const recoveryClient=await guest(),newPassword='New-test-password-123456';
+  assert.equal((await call(recoveryClient,'/api/account/recover','POST',{username:'member_test',recoveryCode:'wrong',password:newPassword})).status,401);
+  db.prepare("DELETE FROM auth_attempts WHERE key LIKE 'mail-cooldown:%'").run();
+  const proof=await emailProof(call,recoveryClient,mailbox,'member_test@njnu.edu.cn','recover');
+  const reset=await call(recoveryClient,'/api/account/recover','POST',{...proof,password:newPassword});assert.equal(reset.status,200);assert.equal(reset.data.recoveryCode,undefined);
+  assert.equal((await call(member,'/api/my/reviews')).status,401);assert.equal((await call(second,'/api/my/reviews')).status,401);
+  const newGuest=await guest();assert.equal((await call(newGuest,'/api/account/recover','POST',{...proof,password:newPassword})).status,400);
+  assert.equal((await call(newGuest,'/api/account/login','POST',{username:'member_test',password})).status,401);
+  assert.equal((await call(newGuest,'/api/account/login','POST',{username:'member_test',password:newPassword})).status,200);
+  assert.ok((await call(newGuest,'/api/my/reviews')).data.items.some(r=>r.id===reviewId));member=newGuest;
+  const otherDevice=await guest();await call(otherDevice,'/api/account/login','POST',{username:'member_test',password:newPassword});
+  assert.equal((await call(member,'/api/account/password','POST',{currentPassword:'wrong',password})).status,401);
+  assert.equal((await call(member,'/api/account/password','POST',{currentPassword:newPassword,password})).status,200);
+  assert.equal((await call(otherDevice,'/api/my/reviews')).status,401);
+  const old={...member};await call(member,'/api/account/logout','POST',{});assert.equal((await call(old,'/api/my/reviews')).status,401);
+});

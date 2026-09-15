@@ -1,0 +1,20 @@
+/* Standalone authentication pages, following the user's GitHub layout reference. */
+.auth-shell{width:min(352px,calc(100% - 40px));margin:0 auto;padding:48px 0 64px}
+.auth-site-mark{display:flex;align-items:center;justify-content:center;width:56px;height:56px;margin:0 auto 24px;border-radius:50%;background:var(--brand);color:#fff!important}
+.auth-site-mark:hover{background:var(--brand-dark)}
+.auth-site-mark:focus-visible{box-shadow:inset 0 0 0 1px #fff;text-decoration:none}
+.auth-shell>h1{margin:0 0 34px;text-align:center;font-size:24px;font-weight:500;line-height:1.45;letter-spacing:-.4px}
+.auth-shell .community-form{gap:20px}
+.auth-shell .community-form label{font-size:14px;font-weight:500;gap:8px}
+.auth-shell .community-form input{min-height:42px;padding:9px 12px;border-radius:6px;font-size:14px;font-weight:400}
+.auth-password-field{display:grid;gap:8px}
+.auth-label-row{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.auth-label-row a{font-size:13px;text-decoration:none;line-height:1.6}
+.auth-label-row a:hover,.auth-shell .auth-links a:hover{text-decoration:underline}
+.auth-shell .review-primary{width:100%;min-height:42px;font-size:14px;font-weight:600}
+.auth-shell .auth-links{justify-content:center;margin-top:28px;font-size:14px;text-align:center;line-height:1.8}
+.auth-shell>.inline-error,.auth-shell>.review-feedback{margin-bottom:20px}
+.auth-shell .recovery-panel{padding:20px;gap:16px}
+.auth-shell .recovery-panel h2{font-size:18px}
+@media(max-width:480px){.auth-shell{padding-top:32px;padding-bottom:40px}.auth-site-mark{margin-bottom:20px}.auth-shell>h1{font-size:23px;margin-bottom:30px}}
+.email-code-field{display:grid;gap:8px}.email-code-row{display:flex;align-items:stretch;gap:8px}.email-code-row input{flex:1;min-width:0}.email-code-row button{flex-shrink:0;min-width:104px;padding:8px 10px;border:1px solid var(--control-border);border-radius:6px;background:var(--surface);color:var(--brand);font-size:12px}.email-code-row button:hover{background:var(--tint)}.legacy-recovery-toggle{display:block;margin:20px auto 0;font-size:12px;color:var(--muted);text-decoration:underline}.email-verification-panel{margin:18px 0 28px;max-width:460px}.email-verification-panel>p{font-size:13px;line-height:1.8;margin-bottom:16px;color:var(--text-secondary)}.account-email-status{font-size:13px;line-height:1.8;padding:12px 0;color:var(--text-secondary)}

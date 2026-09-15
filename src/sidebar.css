@@ -1,0 +1,12 @@
+.sidebar-rail,.sidebar-collapse{display:none}
+@media(min-width:761px){
+  .sidebar-collapse{display:inline-flex;align-items:center;justify-content:center;gap:2px;flex:0 0 auto;min-height:34px;padding:4px 6px;border-radius:4px;color:var(--text-secondary);font-size:12px;white-space:nowrap}
+  .sidebar-collapse:hover{background:var(--tint);color:var(--brand)}
+  .catalog-app .workspace.sidebar-collapsed{grid-template-columns:44px minmax(0,1fr)}
+  .sidebar-collapsed>.course-sidebar{display:none}
+  .sidebar-collapsed>.sidebar-rail{display:flex;align-items:flex-start;justify-content:center;border-right:1px solid var(--line);background:var(--surface-subtle);padding:13px 3px}
+  .sidebar-rail button{position:relative;display:flex;flex-direction:column;align-items:center;gap:12px;width:36px;min-height:108px;padding:10px 6px;border-radius:5px;color:var(--text-secondary)}
+  .sidebar-rail button:hover{background:var(--tint);color:var(--brand)}
+  .sidebar-rail button>span:not(.rail-filter-dot){writing-mode:vertical-rl;letter-spacing:3px;font-size:12px}
+  .rail-filter-dot{position:absolute;top:7px;right:5px;width:5px;height:5px;border-radius:50%;background:var(--brand)}
+}

@@ -1,0 +1,11 @@
+import {readFileSync,writeFileSync,renameSync} from 'node:fs';
+import {parseEnv} from 'node:util';
+const old=readFileSync('.env','utf8');
+const password=readFileSync('.env.aliyun-password','utf8').replace(/^\uFEFF/,'').replace(/[\r\n]+$/,'');
+if(!password.trim()||/[\r\n\0]/.test(password))throw Error('Invalid SMTP password file');
+const config={...parseEnv(old),SMTP_HOST:'smtpdm.aliyun.com',SMTP_PORT:'465',SMTP_USER:'noreply@mail.nnucr.cn',SMTP_PASS:password,MAIL_FROM:'南师选课簿 <noreply@mail.nnucr.cn>'};
+const backup='.env.before-aliyun-'+new Date().toISOString().replaceAll(':','-');
+writeFileSync(backup,old,{mode:0o600,flag:'wx'});
+writeFileSync('.env.pending',Object.entries(config).map(([key,value])=>`${key}=${JSON.stringify(value)}`).join('\n')+'\n',{mode:0o600});
+renameSync('.env.pending','.env');
+console.log('Local SMTP configuration synchronized; previous settings retained privately. No secrets displayed.');

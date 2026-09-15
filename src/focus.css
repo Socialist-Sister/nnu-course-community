@@ -1,0 +1,6 @@
+/* Shared focus treatment for existing and future controls: no outer rings. */
+:focus,:focus-visible,:focus-within{outline:none;outline-offset:0}
+:is(input,select,textarea):focus{border-color:var(--focus-border);box-shadow:none}
+:is(button,[role="button"]):focus-visible{background-image:linear-gradient(var(--focus-tint),var(--focus-tint));box-shadow:inset 0 0 0 1px var(--focus-border)}
+:is(a,summary):focus-visible{text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:4px}
+label:has(> input:is([type="radio"],[type="checkbox"]):focus-visible){border-color:var(--focus-border);background-color:var(--focus-tint)}

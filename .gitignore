@@ -1,0 +1,30 @@
+node_modules/
+dist/
+database/*.sqlite*
+database/backups/
+database/*setup-code.txt
+.env
+.env.*
+!.env.example
+*.log
+.deployment/
+local-backups/
+
+# Private runtime data and local audit material
+/database/
+/qa/
+*.sqlite*
+*.db
+*.db-*
+*.pem
+*.key
+*setup-code.txt
+*.tar.gz
+*.zip
+*.xlsx
+*.har
+# Local operational notes are not collaboration documentation
+/*.md
+!/README.md
+!/CONTRIBUTING.md
+/deploy/diagnose-mail.mjs

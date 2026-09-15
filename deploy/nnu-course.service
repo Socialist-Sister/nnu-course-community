@@ -1,0 +1,25 @@
+[Unit]
+Description=NNU Course Community
+After=network.target
+
+[Service]
+Type=simple
+User=nnu-app
+Group=nnu-app
+WorkingDirectory=/opt/nnu-course/current
+EnvironmentFile=/etc/nnu-course/app.env
+ExecStart=/usr/local/bin/node --max-old-space-size=256 server/index.mjs
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/nnu-course
+MemoryHigh=450M
+MemoryMax=600M
+
+[Install]
+WantedBy=multi-user.target

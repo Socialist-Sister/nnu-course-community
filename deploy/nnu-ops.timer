@@ -1,0 +1,10 @@
+[Unit]
+Description=Check NNU operations every five minutes
+[Timer]
+OnBootSec=2min
+OnUnitInactiveSec=5min
+RandomizedDelaySec=20
+Unit=nnu-ops.service
+[Install]
+WantedBy=timers.target
+

@@ -1,0 +1,40 @@
+.review-primary{background:var(--brand);color:#fff;padding:9px 15px;border-radius:6px;font-size:13px;min-height:38px;white-space:nowrap}
+.review-primary:hover,.review-primary:focus-visible{background:var(--brand-dark);color:#fff}button:disabled{cursor:not-allowed;opacity:.55}
+.review-heading{gap:10px}.review-heading h2{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.review-average{font-size:14px;font-weight:500;color:var(--brand);margin-left:5px}
+.review-loading,.review-feedback{padding:12px 0;font-size:13px;color:var(--text-secondary);line-height:1.7}
+.student-review{padding:17px 0;border-bottom:1px solid var(--tint)}
+.student-review-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;font-size:13px;color:var(--text)}
+.student-review-heading>span{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.student-review-heading small{font-size:11px;background:var(--tint);padding:2px 5px;border-radius:3px;color:var(--text-secondary)}
+.student-review-heading strong{display:flex;align-items:center;gap:4px;color:var(--brand);white-space:nowrap;font-weight:500}
+.student-review-scope{font-size:11px;color:var(--muted);margin-top:6px;line-height:1.7;overflow-wrap:anywhere}
+.student-review-content{font-size:14px;line-height:1.85;color:var(--text);margin-top:10px;white-space:pre-wrap;overflow-wrap:anywhere}
+.student-review-footer{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:11px;color:var(--muted);margin-top:7px}
+.student-review-footer>div{display:flex;gap:15px}.student-review-footer>button,.student-review-footer>div>button{color:var(--text-secondary);padding:8px 0;font-size:12px}
+.student-review.withdrawn{background:var(--surface);padding:15px 12px;border-radius:5px;margin-top:10px}
+.withdraw-confirm{display:flex;align-items:center;gap:15px;flex-wrap:wrap;background:var(--surface);padding:10px;font-size:12px;line-height:1.7;color:var(--text-secondary)}
+.withdraw-confirm button{padding:7px 0;text-decoration:underline}
+.student-review-footer .review-delete-button{color:#9b4c4c}
+.delete-confirm{background:#fcf4f3;color:#924747}
+.review-pagination{display:flex;justify-content:center;align-items:center;gap:20px;font-size:12px;margin-top:18px;color:var(--text-secondary)}.review-pagination button{padding:10px}
+dialog.review-dialog{width:min(600px,calc(100vw - 24px));max-height:calc(100dvh - 32px);padding:0;border-radius:12px;overflow:auto;color:var(--text)}
+.review-dialog .dialog-head{padding:20px 24px 15px;align-items:flex-start;border-bottom:1px solid var(--tint)}
+.review-dialog .dialog-head h2{font-size:20px}.review-dialog .dialog-head p{font-size:13px;margin-top:6px;line-height:1.5}
+.review-form{padding:20px 24px}.review-form fieldset{border:0;margin:0;padding:0;min-width:0}
+.review-form label{display:flex;flex-direction:column;gap:7px;font-size:13px;min-width:0}
+.review-form select,.review-form textarea{width:100%;min-width:0;background:#fff;border:1px solid var(--control-border);border-radius:5px;padding:10px;font:inherit;color:var(--text);line-height:1.6}
+.review-form select{height:44px;text-overflow:ellipsis;margin-top:0}.review-form textarea{resize:vertical;min-height:125px;margin-top:0}
+.review-form textarea:focus{outline:none;box-shadow:none;border-color:var(--focus-border)}
+.review-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px}
+.review-form-note{font-size:11px;line-height:1.8;color:var(--muted);margin:10px 0}
+.review-form .rating-input{display:block;margin:17px 0}.rating-input legend{font-size:13px;margin-bottom:9px}
+.rating-input>div{display:flex;gap:8px}.review-form .rating-input label{position:relative;flex:1;flex-direction:row;align-items:center;justify-content:center;gap:5px;border:1px solid var(--line);border-radius:5px;min-height:44px;cursor:pointer}
+.rating-input input{position:absolute;opacity:0;inset:0;width:100%;height:100%;cursor:pointer}
+.review-form .rating-input label:focus-within{border-color:var(--brand);background:var(--surface)}.rating-input label.selected{color:var(--brand);background:var(--surface);border-color:var(--focus-border)}
+.rating-input p,.review-character-count{font-size:11px;color:var(--muted);margin-top:7px}.review-character-count{text-align:right;margin-top:0}
+.review-form-actions{display:flex;justify-content:flex-end;align-items:center;gap:12px;margin-top:16px}.review-form-actions .secondary-button{padding:9px 12px;min-height:40px}
+.review-form .review-dimension-inputs{margin:0 0 18px}.review-dimension-inputs legend{font-size:13px;margin-bottom:10px}.review-dimension-inputs legend span{font-size:11px;color:var(--muted);margin-left:5px}
+.review-dimension-inputs>div{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 14px}
+.student-review-dimensions{display:flex;flex-wrap:wrap;gap:6px 12px;margin-top:8px;font-size:12px;line-height:1.7;color:var(--muted)}.student-review-dimensions b{font-weight:400;color:var(--text)}
+@media(max-width:480px){.review-dialog .dialog-head{padding:16px}.review-form{padding:16px}.review-form-grid{grid-template-columns:1fr;gap:12px}.rating-input>div{gap:5px}.review-form .rating-input label{gap:3px;font-size:12px}.rating-input svg{width:14px}.review-heading h2{font-size:16px}.review-average{margin:0}.student-review-content{font-size:14px}}

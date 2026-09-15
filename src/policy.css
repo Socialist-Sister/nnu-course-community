@@ -1,0 +1,7 @@
+.about-dialog .about-school-link{margin-top:24px}
+.about-first-note{font-size:12px!important;color:var(--muted);margin-top:18px!important}.about-continue{display:block;margin:20px 0 0 auto;min-width:110px}
+.policy-page{height:100dvh;overflow:auto;background:var(--paper,#fff);color:var(--ink,#28392e)}
+.policy-shell{max-width:860px;margin:0 auto;padding:32px 28px 64px;font-size:16px;line-height:1.85;overflow-wrap:anywhere}
+.policy-shell h1{font-size:30px;margin:20px 0 8px}.policy-shell h2{font-size:20px;margin:28px 0 8px}.policy-shell p{margin:10px 0}.policy-shell li{margin:8px 0}.policy-meta{font-size:13px;color:var(--muted,#6a786e)}
+.policy-links{display:flex;flex-wrap:wrap;gap:8px 20px;font-size:13px}.policy-links a,.policy-shell a{color:var(--green,#386f53);text-decoration:underline;text-underline-offset:3px}.policy-contact{padding:12px 20px;background:#f3f8f4;border:1px solid #dbe6de;border-radius:10px}.policy-contact h2{margin-top:6px}.auth-page>.auth-shell>.policy-links{justify-content:center;margin-top:22px}.auth-policy-notice{font-size:13px;line-height:1.7;color:var(--muted,#6a786e)}
+@media(max-width:600px){.policy-shell{padding:24px 18px 44px;font-size:15px}.policy-shell h1{font-size:26px}.site-footer .policy-links{gap:10px;font-size:11px}.site-footer{flex-wrap:wrap;row-gap:5px}}

@@ -1,0 +1,12 @@
+[Unit]
+Description=Back up NNU SQLite database
+[Service]
+Type=oneshot
+User=nnu-app
+Group=nnu-app
+UMask=0077
+ExecStart=/usr/local/bin/node /opt/nnu-course/current/deploy/backup.mjs
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/nnu-course

@@ -1,0 +1,25 @@
+import {useEffect,useRef,useState} from 'react';
+import {ArrowRight,ArrowUpRight,ChatCircleText,MagnifyingGlass,Star} from '@phosphor-icons/react';
+
+import {CourseBadges} from './CourseBadges.jsx';
+const date=s=>new Intl.DateTimeFormat('zh-CN',{timeZone:'Asia/Shanghai',year:'numeric',month:'numeric',day:'numeric'}).format(new Date(s));
+export function Home({meta,metaError,onMetaRetry,onOpen}){
+  const [query,setQuery]=useState(''),[feed,setFeed]=useState(null),[error,setError]=useState(''),[retry,setRetry]=useState(0);
+  const input=useRef(null),composing=useRef(false);
+  useEffect(()=>{const c=new AbortController();setError('');fetch('/api/home',{signal:AbortSignal.any([c.signal,AbortSignal.timeout(15000)])}).then(async r=>{if(!r.ok)throw Error('暂时无法加载最新评价');return r.json();}).then(setFeed).catch(()=>{if(!c.signal.aborted)setError('暂时无法加载最新评价');});return()=>c.abort();},[retry]);
+  useEffect(()=>{const key=e=>{if(e.key==='/'&&!document.querySelector('dialog[open]')&&!['INPUT','TEXTAREA','SELECT'].includes(e.target.tagName)&&!e.target.isContentEditable){e.preventDefault();input.current?.focus();}};window.addEventListener('keydown',key);return()=>window.removeEventListener('keydown',key);},[]);
+  function link(e,options){if(e.button!==0||e.metaKey||e.ctrlKey||e.shiftKey||e.altKey)return;e.preventDefault();onOpen(options);}
+  const categories=meta?.commonCategories||[];
+  return <main className="home-page" id="home-content" tabIndex={-1}><div className="home-container">
+    <section className="home-search-section" aria-labelledby="home-title"><div className="home-intro"><span className="home-eyebrow">南京师范大学 · 同学的选课经验</span><h1 id="home-title">选课之前，<br className="home-title-break"/>听听同学怎么说。</h1></div>
+      <form className="home-search" role="search" onSubmit={e=>{e.preventDefault();if(!composing.current)onOpen({q:query.trim()});}}><MagnifyingGlass size={24} aria-hidden="true"/><input ref={input} aria-label="主页搜索课程或教师" aria-describedby="home-search-help" placeholder="课程号 / 课程名 / 教师姓名" maxLength={100} value={query} onChange={e=>setQuery(e.target.value)} onCompositionStart={()=>{composing.current=true;}} onCompositionEnd={()=>{composing.current=false;}}/><button type="submit">搜索 <ArrowRight size={18}/></button></form>
+      <div className="home-search-bottom"><p id="home-search-help">支持“高数”“大物”等简称，多个关键词用空格分隔</p><a href="/courses" onClick={e=>link(e,{})}>浏览课程库 <ArrowUpRight size={14}/></a></div>
+      <div className="home-shortcuts" aria-label="公共课"><span>常用课程</span>{categories.filter(c=>c.kind==='course').map(c=><a key={c.id} href={`/courses?topic=${c.id}`} onClick={e=>link(e,{topic:c.id})}>{c.name}{c.status==='not-collected'&&<small>待补录</small>}</a>)}</div>
+      {metaError&&<p className="inline-error" role="alert">分类加载失败 <button onClick={onMetaRetry}>重试</button></p>}
+    </section>
+    <div className="home-columns"><section className="home-latest" aria-labelledby="home-latest-title"><div className="home-section-heading"><h2 id="home-latest-title">最新评价</h2><span>按发布时间</span></div>
+      {error?<div className="home-feed-empty" role="alert"><p>{error}</p><button onClick={()=>setRetry(v=>v+1)}>重新加载</button></div>:!feed?<p className="home-loading" role="status">正在加载评价…</p>:feed.reviews.length===0?<div className="home-feed-empty"><ChatCircleText size={28}/><h3>还没有同学留下评价</h3><p>找到修读过的课程，写下你的体验。</p><a href="/courses" onClick={e=>link(e,{})}>查找课程，写评价 <ArrowRight size={15}/></a></div>:<div className="home-review-list">{feed.reviews.map(r=><article className="home-review" key={r.id}><a href={`/courses?course=${encodeURIComponent(r.courseId)}&teacher=${encodeURIComponent(r.teacherId)}`} onClick={e=>link(e,{course:r.courseId,teacher:r.teacherId})}><div className="home-review-title"><h3>{r.courseName}</h3><span><Star size={14} weight="fill"/>{r.rating} 分</span></div><p className="home-review-scope"><CourseBadges boya={r.boya}/><span className="home-review-context">{r.teacher}{r.semesterLabel&&` · ${r.semesterLabel}`}{r.originalName&&` · ${r.originalName}`}</span></p><p className="home-review-text">{r.excerpt}</p><div className="home-review-bottom"><span>{r.author} · {date(r.createdAt)}</span><span>查看评价 <ArrowUpRight size={13}/></span></div></a></article>)}</div>}
+    </section><aside className="home-categories" aria-label="常用课程分类">{[{kind:'course',title:'公共课'},{kind:'liberal',title:'博雅课'},{kind:'civics',title:'思政课'}].map(({kind,title})=><section key={kind}><div className="home-section-heading"><h2>{title}</h2><span>{kind==='liberal'?'24版培养方案':'按类别查课'}</span></div><div className="home-category-list">{categories.filter(c=>c.kind===kind).map(c=><a key={c.id} href={`/courses?topic=${c.id}`} onClick={e=>link(e,{topic:c.id})}><span>{c.name}</span>{c.status==='pending'?<small>待补充</small>:c.status==='not-collected'?<small>待补录</small>:<ArrowUpRight size={14}/>}</a>)}{!meta&&!metaError&&<p className="home-loading">正在加载分类…</p>}</div></section>)}</aside></div>
+    <footer className="home-footer"><p>学生自发建设 · 非学校官方网站</p><nav aria-label="页脚网站说明"><a href="/privacy">隐私说明</a><a href="/terms">使用说明</a><a href="/contact">联系与反馈</a></nav></footer>
+  </div></main>;
+}

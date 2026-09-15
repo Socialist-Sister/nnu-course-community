@@ -1,0 +1,5 @@
+.course-mode-badge{display:inline-flex;align-items:center;flex-shrink:0;width:fit-content;vertical-align:middle;border:1px solid var(--line,#cfdfd4);border-radius:4px;padding:1px 6px;background:var(--tint,#edf5ef);color:var(--brand);font-size:11px;font-weight:500;line-height:1.6;white-space:nowrap;margin:0}
+.catalog-app .row-meta,.home-review .home-review-scope{display:flex;align-items:center;flex-wrap:wrap;gap:6px 8px;white-space:normal;overflow:visible}
+.row-meta-text,.home-review-context{min-width:0;overflow-wrap:anywhere}
+.course-heading .course-mode-badge{margin:7px 0 0}
+.reference-note{overflow-wrap:anywhere}

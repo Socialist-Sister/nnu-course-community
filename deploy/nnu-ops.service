@@ -1,0 +1,20 @@
+[Unit]
+Description=NNU service, backup, disk and expiry alerts
+After=network-online.target
+[Service]
+Type=oneshot
+User=nnu-app
+Group=nnu-app
+EnvironmentFile=/etc/nnu-course/app.env
+EnvironmentFile=/etc/nnu-course/ops.env
+ExecStart=/usr/local/bin/node /opt/nnu-course/current/deploy/ops-monitor.mjs
+StateDirectory=nnu-ops
+StateDirectoryMode=0700
+UMask=0077
+TimeoutStartSec=60
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/var/lib/nnu-ops
+
