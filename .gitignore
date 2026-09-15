@@ -28,3 +28,6 @@ local-backups/
 !/README.md
 !/CONTRIBUTING.md
 /deploy/diagnose-mail.mjs
+
+__pycache__/
+*.pyc

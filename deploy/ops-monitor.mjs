@@ -12,7 +12,7 @@ function service(name){try{const text=execFileSync('systemctl',['show',name,'-p'
 async function httpsHealth(){return new Promise(resolve=>{const req=request({hostname:'127.0.0.1',port:443,servername:'nnucr.cn',headers:{Host:'nnucr.cn'},path:'/api/health',timeout:5000},res=>{const certExpiresAt=Date.parse(res.socket.getPeerCertificate().valid_to);let body='';res.on('data',chunk=>body+=chunk);res.on('end',()=>{try{resolve({httpsHealthy:res.statusCode===200&&JSON.parse(body).status==='ok',certExpiresAt});}catch{resolve({httpsHealthy:false,certExpiresAt});}});});req.on('timeout',()=>req.destroy());req.on('error',()=>resolve({httpsHealthy:false}));req.end();});}
 const now=Date.now(),services={};
 for(const name of ['nnu-course','nginx'])services[name]={active:service(name+'.service').ActiveState};
-for(const name of ['nnu-backup','nnu-cert-renew'])services[name]={timer:service(name+'.timer').ActiveState,result:service(name+'.service').Result};
+for(const name of ['nnu-backup','nnu-cert-renew','logrotate'])services[name]={timer:service(name+'.timer').ActiveState,result:service(name+'.service').Result};
 let appHealthy=false;try{const r=await fetch('http://127.0.0.1:4180/api/health',{signal:AbortSignal.timeout(5000)});appHealthy=r.ok&&(await r.json()).status==='ok';}catch{}
 const directory='/var/lib/nnu-course/backups';let latestBackupAt=0,diskPercent=null;
 try{const disk=statfsSync('/var/lib/nnu-course');diskPercent=Math.ceil(100*(disk.blocks-disk.bavail)/disk.blocks);}catch{checkErrors.push('disk');}

@@ -14,7 +14,7 @@ export function evaluateOps(sample,config={},now=Date.now()){
   if(!sample.httpsHealthy)add('https-health','critical','本机 HTTPS 入口健康检查未通过，请检查 Nginx、证书和应用');
   if(sample.diskPercent>=80)add('disk',sample.diskPercent>=90?'critical':'warning',`数据库所在磁盘已使用 ${sample.diskPercent}%`,sample.diskPercent>=90);
   if(!sample.latestBackupAt||now-sample.latestBackupAt>30*3600000)add('backup-age','critical','最近一次数据库备份已超过30小时，或未找到备份',true);
-  for(const service of ['nnu-backup','nnu-cert-renew']){
+  for(const service of ['nnu-backup','nnu-cert-renew',...(sample.services.logrotate?['logrotate']:[])]){
     if(sample.services[service]?.timer!=='active')add(service+':timer','warning',service+' 定时器未启用',true);
     if(sample.services[service]?.result&&sample.services[service].result!=='success')add(service+':failed','critical',service+' 最近一次执行失败',true);
   }

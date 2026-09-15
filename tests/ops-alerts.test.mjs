@@ -39,7 +39,13 @@ test('未成功投递不推进通知状态，后续会重试',()=>{
   assert.equal(planNotifications(state,issues,now).notify.length,1);assert.equal(planNotifications(state,issues,now+300000).notify.length,1);
 });
 test('公开联系接口严格白名单，不泄露提醒收件人或SMTP信息',()=>{
-  assert.deepEqual(siteInfo({PUBLIC_CONTACT_EMAIL:'help@example.test',OPS_ALERT_TO:'private@example.test',SMTP_PASS:'secret'}),{contactEmail:'help@example.test',policyUpdatedAt:'2026-09-14'});
+  assert.deepEqual(siteInfo({PUBLIC_CONTACT_EMAIL:'help@example.test',OPS_ALERT_TO:'private@example.test',SMTP_PASS:'secret'}),{contactEmail:'help@example.test',policyUpdatedAt:'2026-09-15'});
   assert.equal(siteInfo({OPS_ALERT_TO:'private@example.test'}).contactEmail,null);
   assert.equal(siteInfo({PUBLIC_CONTACT_EMAIL:'bad\nBcc:x@example.test'}).contactEmail,null);
+});
+
+test('日志轮转定时器关闭与执行失败触发运维提醒',()=>{
+ const s=healthy();s.services.logrotate={timer:'active',result:'success'};assert.deepEqual(evaluateOps(s,config,now),[]);
+ s.services.logrotate.timer='inactive';assert.ok(evaluateOps(s,config,now).some(i=>i.id==='logrotate:timer'));
+ s.services.logrotate={timer:'active',result:'exit-code'};assert.ok(evaluateOps(s,config,now).some(i=>i.id==='logrotate:failed'));
 });
