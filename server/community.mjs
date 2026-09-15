@@ -1,3 +1,4 @@
+import {checkAdminAccess,readAdminMembers,writeAdminMember} from './admin-members.mjs';
 import {randomUUID,timingSafeEqual} from 'node:crypto';
 import {ApiError,courseDetail,listCourses} from './catalog.mjs';
 import {ownedIds,requireAccount,requireAdmin,transaction,digest,rateLimit} from './accounts.mjs';
@@ -29,7 +30,8 @@ export function reportReview(db,person,id,data){
   const reportId=randomUUID(),time=now();db.prepare('INSERT INTO reports VALUES(?,?,?,?,?,?,?,?)').run(reportId,id,person.account.id,reason,'open','',time,time);return {id:reportId};
 }
 export function adminRead(db,person,path,params){
-  requireAdmin(person);
+  requireAdmin(person);checkAdminAccess(db,person,path);
+  if(path==='members')return readAdminMembers(db,params);
   if(path==='overview')return {openReports:db.prepare("SELECT COUNT(*) AS n FROM reports WHERE status='open'").get().n,accounts:db.prepare('SELECT COUNT(*) AS n FROM accounts').get().n,published:db.prepare("SELECT COUNT(*) AS n FROM reviews WHERE status='published'").get().n};
   const p=page(params),offset=(p-1)*20;
   if(path==='reports'){
@@ -67,14 +69,15 @@ export function adminRead(db,person,path,params){
   throw new ApiError(404,'后台页面不存在');
 }
 export function adminWrite(db,person,path,data){
+  if(path==='members')return writeAdminMember(db,person,data);
   if(path==='setup'){
     requireAccount(person);rateLimit(db,`setup:${person.userId}`,5);
     const row=db.prepare('SELECT token_hash FROM admin_setup WHERE id=1').get();
     if(db.prepare("SELECT 1 FROM accounts WHERE role='admin'").get())throw new ApiError(409,'管理员已设置');
     if(!row||typeof data.code!=='string'||!timingSafeEqual(Buffer.from(digest(data.code.trim()),'hex'),Buffer.from(row.token_hash,'hex')))throw new ApiError(403,'管理初始化码不正确');
-    transaction(db,()=>{db.prepare("UPDATE accounts SET role='admin' WHERE user_id=?").run(person.userId);db.exec('DELETE FROM admin_setup');audit(db,person,'admin.setup',person.userId,{});});return {ok:true};
+    transaction(db,()=>{db.prepare("UPDATE accounts SET role='admin' WHERE user_id=?").run(person.userId);db.prepare('INSERT INTO site_owner VALUES(1,?)').run(person.userId);db.exec('DELETE FROM admin_setup');audit(db,person,'admin.setup',person.userId,{});});return {ok:true};
   }
-  requireAdmin(person);
+  requireAdmin(person);checkAdminAccess(db,person,path);
   if(path.startsWith('reviews/')){
     const id=path.slice(8),r=db.prepare('SELECT * FROM reviews WHERE id=?').get(id);if(!r)throw new ApiError(404,'评价不存在');
     if(!['block','restore'].includes(data.action))throw new ApiError(400,'管理操作无效');const reason=text(data.reason,'处理说明');

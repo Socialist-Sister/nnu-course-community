@@ -110,3 +110,36 @@ test('邮箱重置密码：验证码只能用一次，旧设备全部退出，�
   assert.equal((await call(otherDevice,'/api/my/reviews')).status,401);
   const old={...member};await call(member,'/api/account/logout','POST',{});assert.equal((await call(old,'/api/my/reviews')).status,401);
 });
+
+test('负责人独占授权、权限隔离、CSRF、即时撤销和审计',async()=>{
+  const content=await register('content_staff'),courses=await register('course_staff');
+  assert.equal((await call(admin,'/api/session')).data.account.isOwner,true);
+  assert.equal((await call(admin,'/api/account/deletion')).data.canDelete,false);
+  const found=await call(admin,'/api/admin/members?username=CONTENT_STAFF');
+  assert.equal(found.data.member.id,content.account.id);assert.equal(found.data.member.email,undefined);
+  const grant={id:content.account.id,action:'grant',content:true,courses:false};
+  assert.equal((await call(content,'/api/admin/members')).status,403);
+  assert.equal((await call(content,'/api/admin/members','POST',grant)).status,403);
+  assert.equal((await call(admin,'/api/admin/members','POST',grant,{'X-CSRF-Token':'wrong'})).status,403);
+  db.prepare('UPDATE accounts SET email_verified_at=NULL WHERE user_id=?').run(content.account.id);
+  assert.equal((await call(admin,'/api/admin/members','POST',grant)).status,400);
+  db.prepare('UPDATE accounts SET email_verified_at=? WHERE user_id=?').run(new Date().toISOString(),content.account.id);
+  assert.equal((await call(admin,'/api/admin/members','POST',grant)).status,200);
+  assert.equal((await call(content,'/api/admin/reviews')).status,200);
+  for(const p of ['members','members?username=member_test','audit','courses','overview'])assert.equal((await call(content,'/api/admin/'+p)).status,403,p);
+  assert.equal((await call(content,'/api/admin/courses/1000000015','POST',{reset:true})).status,403);
+  assert.equal((await call(content,'/api/admin/members','POST',{...grant,id:courses.account.id})).status,403);
+  assert.equal((await call(admin,'/api/admin/members','POST',{id:courses.account.id,action:'grant',content:false,courses:true})).status,200);
+  assert.equal((await call(courses,'/api/admin/courses')).status,200);
+  assert.equal((await call(courses,'/api/admin/reports')).status,403);
+  assert.equal((await call(courses,'/api/admin/reviews/missing','POST',{action:'block',reason:'test'})).status,403);
+  for(const action of ['grant','revoke'])assert.equal((await call(admin,'/api/admin/members','POST',{...grant,id:admin.account.id,action})).status,403);
+  assert.equal((await call(admin,'/api/account/delete','POST',{currentPassword:password,confirmation:'注销账号'})).status,409);
+  assert.equal((await call(admin,'/api/admin/members','POST',{...grant,content:false})).status,400);
+  assert.equal((await call(admin,'/api/admin/members','POST',{...grant,action:'revoke'})).status,200);
+  assert.equal((await call(content,'/api/admin/reviews')).status,403);
+  assert.equal((await call(content,'/api/admin/reports/missing','POST',{status:'resolved',resolution:'test'})).status,403);
+  assert.equal((await call(content,'/api/session')).data.account.role,'member');
+  assert.equal(db.prepare("SELECT COUNT(*) n FROM admin_audit WHERE action IN ('admin.grant','admin.revoke')").get().n,3);
+  assert.equal(db.prepare('PRAGMA foreign_key_check').all().length,0);
+});

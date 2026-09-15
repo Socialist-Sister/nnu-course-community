@@ -1,4 +1,5 @@
 // Accepted direction: a persistent local catalog with a separate HTTP API; preserve the third design.
+import {migrateAdminMembers} from './admin-members.mjs';
 import { DatabaseSync } from 'node:sqlite';
 import { readFileSync, mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
@@ -24,6 +25,7 @@ export function openDatabase(filename = process.env.DATABASE_PATH || defaultDbPa
     migrateAccountDeletion(db);
     migrateProfiles(db);
     migrateBookmarks(db);
+    migrateAdminMembers(db);
   }
   return db;
 }

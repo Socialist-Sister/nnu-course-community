@@ -187,6 +187,7 @@ test('唯一管理员不可注销；多管理员注销后审计记录保留并�
   assert.equal((await f.call(c,'/api/account/delete','POST',body)).status,409);
   const other=await f.guest(),b=await f.register(other,'remaining_admin');
   f.db.prepare("UPDATE accounts SET role='admin' WHERE user_id=?").run(b.account.id);
+  f.db.prepare('INSERT INTO site_owner VALUES(1,?)').run(b.account.id);
   f.db.prepare('INSERT INTO admin_audit VALUES(?,?,?,?,?,?)').run('old-audit',a.account.id,'admin.setup',a.account.id,'{}',new Date().toISOString());
   assert.equal((await f.call(c,'/api/account/delete','POST',body)).status,200);
   const audit=(await f.call(other,'/api/admin/audit')).data;

@@ -1,6 +1,7 @@
 // Campus-mail verification gates publishing; public reviews remain anonymous.
 import {randomBytes,randomUUID,createHash,scrypt as scryptCallback,timingSafeEqual} from 'node:crypto';
 import {promisify} from 'node:util';
+import {adminAccess} from './admin-members.mjs';
 import {clientIp} from './client-ip.mjs';
 import {mailLimits} from './mail-limits.mjs';
 import {writeFileSync,existsSync,readFileSync} from 'node:fs';
@@ -17,7 +18,7 @@ export function currentPerson(db,req){
   if(!row)return null;
   // Only sessions issued directly to the account may authenticate it. Old linked guest cookies are revoked.
   const account=db.prepare('SELECT user_id AS id,username,role,email,email_verified_at AS emailVerifiedAt FROM accounts WHERE user_id=?').get(row.userId);
-  return {...row,account:account?{...account,...profileFields(db,account.id),emailVerified:!!account.emailVerifiedAt}:null};
+  return {...row,account:account?{...account,...adminAccess(db,account.id),...profileFields(db,account.id),emailVerified:!!account.emailVerifiedAt}:null};
 }
 export function ownedIds(db,person){return person?.account?db.prepare('SELECT user_id FROM account_members WHERE account_id=?').all(person.account.id).map(r=>r.user_id):[person?.userId||''];}
 export function requireAccount(person){if(!person?.account)throw new ApiError(401,'请先登录账号');return person;}
@@ -54,7 +55,7 @@ export function accountDeletionInfo(db,person){
   const placeholders=ids.map(()=>'?').join(',');
   const lastAdmin=person.account.role==='admin'&&db.prepare("SELECT COUNT(*) n FROM accounts WHERE role='admin'").get().n<=1;
   return {reviewCount:db.prepare(`SELECT COUNT(*) n FROM reviews WHERE user_id IN (${placeholders})`).get(...ids).n,
-    canDelete:!lastAdmin,reason:lastAdmin?'当前账号是唯一管理员，请先移交管理权限后再注销。':null};
+    canDelete:!lastAdmin&&!adminAccess(db,person.account.id).isOwner,reason:adminAccess(db,person.account.id).isOwner?'站点负责人不能注销账号。':lastAdmin?'当前账号是唯一管理员，请先移交管理权限后再注销。':null};
 }
 export async function accountAction(db,req,res,person,action,data,mailer){
   if(action==='send-code')return sendEmailCode(db,person,data,req,mailer);
