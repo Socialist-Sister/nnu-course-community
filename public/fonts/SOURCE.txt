@@ -1,0 +1,11 @@
+Current header wordmark: 演示秋鸿楷 / Slideqiuhong-Regular, SlideFont Project.
+Source: https://github.com/maoken-fonts/slidefont
+Authorized redistribution/open-source declaration: repository README and documentation.
+License: SIL Open Font License 1.1; see SlideFont-OFL.txt.
+Source SHA-256: d74ea3a8872e10226833793d0075716a4bcc2a3f72edb45cfeac6330f912d899
+Subset: 南师选课簿; renamed NNU Qiuhong Wordmark; glyph outlines unchanged.
+Self-hosted as nnu-qiuhong-wordmark.ttf. Visitors need no font installation or third-party font connection.
+
+Previous font retained: Zhi Mang Xing / Google Fonts, nnu-wordmark.ttf.
+Source: https://github.com/google/fonts/tree/main/ofl/zhimangxing
+License: ZhiMangXing-OFL.txt. No longer used by the header.

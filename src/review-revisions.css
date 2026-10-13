@@ -1,0 +1,15 @@
+.review-revision-status{margin:18px 0;padding:16px 18px;border:1px solid var(--line,#dce5de);border-radius:12px;background:#f5f8f5;font-size:14px;line-height:1.7;overflow-wrap:anywhere}
+.revision-status-line{display:flex;align-items:baseline;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.revision-status-line time,.revision-rating{color:var(--muted,#68786e);font-size:13px}
+.review-revision-status p{margin:8px 0}.review-revision-status summary{cursor:pointer;color:var(--brand)}
+.revision-cancel{margin-top:10px;padding:6px 0;color:var(--brand)}
+.review-form label:has(textarea[aria-label="复核说明"]){margin-top:18px}
+.revision-card{margin:20px 0;padding:24px;border:1px solid var(--line,#dce5de);border-radius:16px;background:white;min-width:0;overflow-wrap:anywhere}
+.revision-comparison{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin:18px 0}
+.revision-comparison>section{padding:16px;background:#f5f8f5;border-radius:10px;min-width:0}
+.revision-comparison h4{margin:0 0 12px;font-size:14px;color:var(--brand)}
+.revision-comparison .student-review-content{font-size:15px;line-height:1.8;margin-bottom:0}
+.revision-note{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.8}
+.admin-revisions h2{font-size:21px;margin:0 0 8px}.admin-revisions .community-muted{font-size:14px;line-height:1.7}
+.admin-revisions .community-toolbar{align-items:end;gap:16px}.admin-revisions .community-toolbar>div{flex:1;min-width:190px}
+@media(max-width:600px){.revision-comparison{grid-template-columns:1fr}.revision-card{padding:16px}.revision-status-line time{font-size:12px}.admin-revisions .community-toolbar{flex-wrap:wrap}}

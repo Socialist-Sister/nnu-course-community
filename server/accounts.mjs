@@ -144,6 +144,8 @@ export async function accountAction(db,req,res,person,action,data,mailer){
       if(!info.canDelete)throw new ApiError(409,info.reason);
       const ids=[...new Set([person.userId,...ownedIds(db,fresh)])],slots=ids.map(()=>'?').join(',');
       const reviews=db.prepare(`SELECT id,created_at FROM reviews WHERE user_id IN (${slots})`).all(...ids);
+      // Private appeal drafts and explanations are removed when their author leaves.
+      db.prepare('DELETE FROM review_revisions WHERE account_id=?').run(person.userId);
       // A separate anonymous identity per review removes even the grouping by account.
       for(const review of reviews){
         const anonymousId=randomUUID();

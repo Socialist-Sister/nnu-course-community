@@ -1,5 +1,9 @@
+import {migrateReportWorkflow} from './report-workflow.mjs';
+import {migrateReviewRevisions} from './review-revisions.mjs';
 // Accepted direction: a persistent local catalog with a separate HTTP API; preserve the third design.
 import {migrateAdminMembers} from './admin-members.mjs';
+import {migrateHelpful} from './helpful.mjs';
+import {migrateNotifications} from './notifications.mjs';
 import { DatabaseSync } from 'node:sqlite';
 import { readFileSync, mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
@@ -26,6 +30,10 @@ export function openDatabase(filename = process.env.DATABASE_PATH || defaultDbPa
     migrateProfiles(db);
     migrateBookmarks(db);
     migrateAdminMembers(db);
+    migrateNotifications(db);
+    migrateHelpful(db);
+    migrateReportWorkflow(db);
+    migrateReviewRevisions(db);
   }
   return db;
 }

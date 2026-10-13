@@ -38,3 +38,18 @@ dialog.review-dialog{width:min(600px,calc(100vw - 24px));max-height:calc(100dvh 
 .review-dimension-inputs>div{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 14px}
 .student-review-dimensions{display:flex;flex-wrap:wrap;gap:6px 12px;margin-top:8px;font-size:12px;line-height:1.7;color:var(--muted)}.student-review-dimensions b{font-weight:400;color:var(--text)}
 @media(max-width:480px){.review-dialog .dialog-head{padding:16px}.review-form{padding:16px}.review-form-grid{grid-template-columns:1fr;gap:12px}.rating-input>div{gap:5px}.review-form .rating-input label{gap:3px;font-size:12px}.rating-input svg{width:14px}.review-heading h2{font-size:16px}.review-average{margin:0}.student-review-content{font-size:14px}}
+
+.student-review-footer .review-report-button{display:inline-flex;align-items:center;justify-content:center;padding:5px 8px;min-height:36px;border:1px solid transparent;border-radius:6px;line-height:1.4;background:transparent}
+.student-review-footer .review-report-button:hover:not(:disabled),.student-review-footer .review-report-button:focus-visible{color:#9b4c4c;background:#faeeee}
+.student-review-footer .review-report-button:focus-visible{border-color:#d8aaaa;outline:none;box-shadow:none}
+@media(max-width:480px){.student-review-footer .review-report-button{min-height:40px}}
+
+.review-heading-actions{display:flex;align-items:center;gap:12px}
+.review-heading-actions .copy-link{margin:0;min-height:38px}
+.review-filters{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1.5fr) minmax(88px,.8fr);align-items:end;gap:12px;margin:16px 0}
+.review-filters>label{display:flex;flex-direction:column;gap:6px;min-width:0;font-size:11px;color:var(--muted)}
+.review-filters .wrapping-select{width:100%;min-width:0}
+.review-filters .category-select-trigger{font-size:12px;min-height:38px;width:100%}
+.review-filters .category-select-trigger>span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.review-filter-summary{font-size:11px;line-height:1.7;color:var(--muted);margin:0 0 12px}
+@media(max-width:480px){.review-filters{gap:8px;grid-template-columns:minmax(0,1.2fr) minmax(0,1.5fr) 88px}.review-filters .category-select-trigger{padding-left:8px;padding-right:8px;gap:4px}.review-heading-actions{gap:10px}}

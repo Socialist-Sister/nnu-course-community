@@ -1,0 +1,25 @@
+.account-avatar-link{position:relative}
+.notification-dot{position:absolute;right:0;top:0;width:8px;height:8px;border-radius:50%;background:#b8463e;border:2px solid #fff;box-sizing:content-box}
+.notification-count{font:600 11px/1.3 system-ui,sans-serif;min-width:18px;padding:2px 5px;border-radius:10px;background:var(--brand);color:#fff;text-align:center}
+.account-page .account-tabs{flex-wrap:wrap}
+.account-notifications{border:1px solid var(--line);border-radius:12px;background:#fff;padding:0 24px 12px}
+.notifications-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:20px 0 10px;flex-wrap:wrap}
+.notifications-heading>div{display:flex;align-items:center;gap:12px}
+.notifications-heading h2{margin:0;font-size:18px}
+.notifications-heading span,.notifications-intro{font-size:12px;color:var(--muted)}
+.notifications-intro{line-height:1.7;margin:0 0 18px}
+.notification-row{border-top:1px solid var(--line);padding:20px 12px;overflow-wrap:anywhere}
+.notification-row.unread{background:var(--surface-subtle)}
+.notification-title{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.notification-title h3{font-size:15px;margin:0}
+.notification-state{color:var(--muted);font-size:11px;white-space:nowrap}
+.unread .notification-state{color:var(--brand);font-weight:600}
+.notification-course{font-size:13px;color:var(--text-secondary);margin:10px 0}
+.notification-reason{font-size:14px;line-height:1.8;white-space:pre-wrap;margin:0}
+.notification-note{font-size:12px;color:var(--muted);line-height:1.7;margin:10px 0 0}
+.notification-footer{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-top:16px;font-size:12px}
+.notification-footer time{color:var(--muted)}
+.notification-footer>div{display:flex;gap:16px}
+.notification-footer a{display:inline-flex;align-items:center;gap:4px}
+.notification-footer button{color:var(--brand);font-size:12px}
+@media(max-width:760px){.account-notifications{padding:0 12px 12px}.notifications-heading{padding-top:16px}.notification-row{padding:16px 8px}.notification-footer>div{margin-left:auto}.account-page .account-tabs button{gap:5px;padding:9px 10px;font-size:13px}}

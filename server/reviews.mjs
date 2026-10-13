@@ -2,6 +2,9 @@ import {randomBytes,randomUUID,createHash} from 'node:crypto';
 import {ApiError,courseDetail} from './catalog.mjs';
 import {studyTerms} from './review-schema.mjs';
 import {reviewDimensions} from '../shared/review-dimensions.mjs';
+import {reviewContentIssue,reviewContentMessage} from '../shared/review-content.mjs';
+import {withHelpful} from './helpful.mjs';
+import {latestRevision} from './review-revisions.mjs';
 import {currentPerson,ownedIds} from './accounts.mjs';
 const dimensionValues=row=>Object.fromEntries(reviewDimensions.map(({key})=>[key,row?.[key]??null]));
 function saveReview(db,id,dimensions,write){
@@ -38,10 +41,12 @@ export async function jsonBody(req,limit=20000){
   let size=0;const chunks=[];for await(const chunk of req){size+=chunk.length;if(size>limit)throw new ApiError(413,'提交内容过长');chunks.push(chunk);}
   try{const data=JSON.parse(Buffer.concat(chunks).toString('utf8'));if(!data||typeof data!=='object'||Array.isArray(data))throw Error();return data;}catch{throw new ApiError(400,'提交格式无效');}
 }
-function validate(db,data,original=null){
+export function validateReviewChange(db,data,original=null,{appealUnchanged=false}={}){
   if(!Number.isInteger(data.rating)||data.rating<1||data.rating>5)throw new ApiError(400,'请选择 1–5 分的评分');
   if(typeof data.content!=='string'||!data.content.trim())throw new ApiError(400,'请填写评价内容');
   if(data.content.trim().length>3000)throw new ApiError(400,'评价最多填写 3000 字');
+  const issue=reviewContentIssue(data.content);
+  if(issue&&!(appealUnchanged&&original?.content===data.content.trim()))throw new ApiError(422,reviewContentMessage(issue),'REVIEW_CONTENT_BLOCKED');
   const detail=courseDetail(db,String(data.courseId||''));
   const group=detail.groups.find(g=>g.sourceGroupIds.includes(data.groupId));
   if(!group?.teachersProvided)throw new ApiError(400,'请选择这门课已收录的授课教师');
@@ -53,8 +58,8 @@ export function writeReview(db,person,data,id=null){
   const owners=ownedIds(db,person),ownership=`user_id IN(${owners.map(()=>'?').join(',')})`;
   const old=id?db.prepare(`SELECT * FROM reviews WHERE id=? AND ${ownership}`).get(id,...owners):null;
   if(id&&!old)throw new ApiError(404,'未找到可修改的评价');
-  if(id&&db.prepare('SELECT 1 FROM review_moderation WHERE review_id=? AND blocked=1').get(id))throw new ApiError(403,'评价已被管理员下架，请等待复核；你仍可撤回并删除');
-  const {detail,content}=validate(db,data,old),now=new Date().toISOString();
+  if(id&&db.prepare('SELECT 1 FROM review_moderation WHERE review_id=? AND blocked=1').get(id))throw new ApiError(403,'评价已被管理员下架，请通过申请复核提交修改；你仍可撤回并删除');
+  const {detail,content}=validateReviewChange(db,data,old),now=new Date().toISOString();
   const dimensions={};
   for(const {key,label} of reviewDimensions){
     if(data[key]==null||data[key]==='')throw new ApiError(400,`请选择${label}`);
@@ -79,7 +84,12 @@ export function writeReview(db,person,data,id=null){
 }
 export function withdrawReview(db,person,id){
   const review=db.prepare('SELECT user_id FROM reviews WHERE id=?').get(id);if(!review||!ownedIds(db,person).includes(review.user_id))throw new ApiError(404,'未找到可撤回的评价');
-  db.prepare("UPDATE reviews SET status='hidden',updated_at=? WHERE id=?").run(new Date().toISOString(),id);return {id,status:'hidden'};
+  db.exec('BEGIN IMMEDIATE');try{
+    const time=new Date().toISOString();
+    db.prepare("UPDATE reviews SET status='hidden',updated_at=? WHERE id=?").run(time,id);
+    db.prepare("UPDATE review_revisions SET status='cancelled',reason='作者撤回了评价',decided_at=? WHERE review_id=? AND status='pending'").run(time,id);
+    db.exec('COMMIT');
+  }catch(e){db.exec('ROLLBACK');throw e;}return {id,status:'hidden'};
 }
 export function deleteReview(db,person,id){
   const review=db.prepare('SELECT status,user_id FROM reviews WHERE id=?').get(id);
@@ -92,11 +102,18 @@ export function readReviews(db,req,code,params){
   const detail=courseDetail(db,code),person=visitor(db,req),teacher=params.get('teacher')||'all';
   const groups=teacher==='all'?detail.groups:detail.groups.filter(g=>g.id===teacher);if(!groups.length&&teacher!=='all')throw new ApiError(400,'教师筛选无效');
   const ids=groups.flatMap(g=>g.sourceGroupIds),pageText=params.get('page')||'1';if(!/^\d+$/.test(pageText)||Number(pageText)<1||Number(pageText)>100000)throw new ApiError(400,'页码无效');
-  const page=Number(pageText),pageSize=20;
-  if(!ids.length)return {items:[],page,total:0,totalPages:0};
+  const page=Number(pageText),pageSize=20,sort=params.get('sort')||'latest',semester=params.get('semester')||'all';
+  if(!['latest','helpful'].includes(sort))throw new ApiError(400,'评价排序无效');
+  const terms=db.prepare('SELECT id,label FROM review_terms ORDER BY id DESC').all();
+  if(!['all','none'].includes(semester)&&!terms.some(t=>t.id===semester))throw new ApiError(400,'修读学期无效');
+  if(!ids.length)return {items:[],page,total:0,totalPages:0,terms};
   const owners=ownedIds(db,person);
-  const where=`r.group_id IN (${ids.map(()=>'?').join(',')}) AND (r.status='published' OR r.user_id IN(${owners.map(()=>'?').join(',')}))`,args=[...ids,...owners];
+  let where=`r.group_id IN (${ids.map(()=>'?').join(',')}) AND (r.status='published' OR r.user_id IN(${owners.map(()=>'?').join(',')}))`;
+  const args=[...ids,...owners];
+  if(semester==='none')where+=' AND r.semester_id IS NULL';
+  else if(semester!=='all'){where+=' AND r.semester_id=?';args.push(semester);}
+  const order=sort==='helpful'?'(SELECT COUNT(*) FROM review_helpful h WHERE h.review_id=r.id) DESC,':'';
   const total=db.prepare(`SELECT COUNT(*) AS n FROM reviews r WHERE ${where}`).get(...args).n;
-  const rows=db.prepare(`SELECT r.*,ap.nickname AS author_nickname,d.difficulty,d.workload,d.grading,d.gain,g.course_code,g.teachers_raw,c.name AS course_name,t.label AS semester_label,m.blocked,m.reason AS moderation_reason FROM reviews r LEFT JOIN account_members am ON am.user_id=r.user_id LEFT JOIN account_profiles ap ON ap.user_id=am.account_id JOIN effective_groups g ON g.id=r.group_id JOIN effective_courses c ON c.code=g.course_code LEFT JOIN review_terms t ON t.id=r.semester_id LEFT JOIN review_dimensions d ON d.review_id=r.id LEFT JOIN review_moderation m ON m.review_id=r.id WHERE ${where} ORDER BY r.status!='published',r.created_at DESC,r.id DESC LIMIT ? OFFSET ?`).all(...args,pageSize,(page-1)*pageSize);
-  return {items:rows.map(r=>({id:r.id,groupId:r.group_id,teacher:r.teachers_raw,courseCode:r.course_code,courseName:r.course_name,semesterId:r.semester_id,semesterLabel:r.semester_label,rating:r.rating,...dimensionValues(r),content:r.content,status:r.status,createdAt:r.created_at,updatedAt:r.updated_at,author:r.author_nickname||'已注销用户',isMine:owners.includes(r.user_id),moderationReason:owners.includes(r.user_id)&&r.blocked?r.moderation_reason:null})),page,total,totalPages:Math.ceil(total/pageSize)};
+  const rows=db.prepare(`SELECT r.*,ap.nickname AS author_nickname,d.difficulty,d.workload,d.grading,d.gain,g.course_code,g.teachers_raw,c.name AS course_name,t.label AS semester_label,m.blocked,m.reason AS moderation_reason FROM reviews r LEFT JOIN account_members am ON am.user_id=r.user_id LEFT JOIN account_profiles ap ON ap.user_id=am.account_id JOIN effective_groups g ON g.id=r.group_id JOIN effective_courses c ON c.code=g.course_code LEFT JOIN review_terms t ON t.id=r.semester_id LEFT JOIN review_dimensions d ON d.review_id=r.id LEFT JOIN review_moderation m ON m.review_id=r.id WHERE ${where} ORDER BY r.status!='published',${order}r.created_at DESC,r.id DESC LIMIT ? OFFSET ?`).all(...args,pageSize,(page-1)*pageSize);
+  return {items:withHelpful(db,person,rows.map(r=>({id:r.id,groupId:r.group_id,teacher:r.teachers_raw,courseCode:r.course_code,courseName:r.course_name,semesterId:r.semester_id,semesterLabel:r.semester_label,rating:r.rating,...dimensionValues(r),content:r.content,status:r.status,createdAt:r.created_at,updatedAt:r.updated_at,author:r.author_nickname||'已注销用户',isMine:owners.includes(r.user_id),moderationReason:owners.includes(r.user_id)&&r.blocked?r.moderation_reason:null,...(owners.includes(r.user_id)?{revision:latestRevision(db,r.id)}:{})}))),page,total,totalPages:Math.ceil(total/pageSize),terms};
 }

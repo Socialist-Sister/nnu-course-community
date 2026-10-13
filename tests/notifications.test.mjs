@@ -1,0 +1,56 @@
+import {before,after,test} from 'node:test';
+import assert from 'node:assert/strict';
+import {notificationFixture} from './notification-fixture.mjs';
+import {newSession} from '../server/accounts.mjs';
+import {migrateNotifications} from '../server/notifications.mjs';
+let f,id,reportId;
+before(async()=>{f=await notificationFixture();});after(async()=>f.close());
+const action=(action,reason='管理员处理说明')=>f.call('notify_owner',`/api/admin/reviews/${f.reviewId}`,'POST',{action,reason});
+const list=name=>f.call(name,'/api/notifications');
+test('通知只在状态变化后产生，关联旧访客作者，且与审核原子提交',async()=>{
+  assert.equal((await list('notify_author')).data.total,0);
+  const report=await f.call('notify_reporter',`/api/reviews/${f.reviewId}/report`,'POST',{reason:'私人举报材料不能通知作者'});reportId=report.data.id;
+  assert.equal((await list('notify_author')).data.total,0);
+  f.db.exec("CREATE TRIGGER fail_notification BEFORE INSERT ON notifications BEGIN SELECT RAISE(ABORT,'test rollback'); END;");
+  assert.equal((await action('block')).status,500);assert.equal(f.db.prepare('SELECT status FROM reviews WHERE id=?').get(f.reviewId).status,'published');
+  f.db.exec('DROP TRIGGER fail_notification');
+  assert.equal((await action('block')).status,200);await action('block');
+  const result=await list('notify_author');assert.equal(result.data.total,1);assert.equal(result.cache,'no-store');id=result.data.items[0].id;
+  assert.equal(result.data.items[0].kind,'review.block');assert.equal(result.data.items[0].reason,'管理员处理说明');
+  assert.equal(JSON.stringify(result.data).includes('私人举报材料'),false);assert.equal(JSON.stringify(result.data).includes('notify_reporter'),false);
+  assert.equal((await list('notify_reporter')).data.total,0);
+  assert.equal((await f.call('notify_reporter',`/api/my/reviews?review=${f.reviewId}`)).data.total,0);
+  assert.equal((await f.call('notify_author',`/api/my/reviews?review=${f.reviewId}`)).data.total,1);
+});
+test('通知读取与已读操作隔离账号，校验登录和CSRF，跨会话同步',async()=>{
+  assert.equal((await list(null)).status,401);
+  assert.equal((await f.call('notify_author','/api/notifications/read','POST',{ids:[id]},{'X-CSRF-Token':'wrong'})).status,403);
+  assert.equal((await f.call('notify_author','/api/notifications/read','POST',{ids:[id]},{Origin:'https://evil.example'})).status,403);
+  await f.call('notify_reporter','/api/notifications/read','POST',{ids:[id]});assert.equal((await list('notify_author')).data.unread,1);
+  assert.equal((await f.call('notify_author','/api/notifications/read','POST',{ids:['all']})).status,400);
+  await f.call('notify_author','/api/notifications/read','POST',{ids:[id]});const readAt=(await list('notify_author')).data.items[0].readAt;
+  await f.call('notify_author','/api/notifications/read','POST',{ids:[id]});assert.equal((await list('notify_author')).data.items[0].readAt,readAt);
+  const second={};second.csrf=newSession(f.db,{setHeader(k,v){second.cookie=v.split(';')[0];}},{socket:{}},'notify_author').csrf;f.clients.second=second;
+  assert.equal((await f.call('second','/api/notifications/unread')).data.unread,0);
+});
+test('解除下架通知不重新发布已撤回评价，举报结果仅发举报人且重复操作不重复发送',async()=>{
+  await f.call('notify_author',`/api/reviews/${f.reviewId}`,'DELETE');await action('restore','复核通过');await action('restore','复核通过');
+  assert.equal(f.db.prepare('SELECT status FROM reviews WHERE id=?').get(f.reviewId).status,'hidden');
+  assert.equal((await list('notify_author')).data.total,2);
+  for(let n=0;n<2;n++)assert.equal((await f.call('notify_owner',`/api/admin/reports/${reportId}`,'POST',{status:'resolved',resolution:'已核查处理'})).status,200);
+  const result=await list('notify_reporter');assert.equal(result.data.total,1);assert.equal(result.data.items[0].kind,'report.resolved');
+  assert.equal((await f.call('notify_owner',`/api/admin/reports/${reportId}`,'POST',{status:'dismissed',resolution:'补充核查后不成立'})).status,409);
+  assert.equal((await list('notify_reporter')).data.items[0].kind,'report.resolved');
+});
+test('删除评价仍可查看通知，分页稳定，重跑迁移保留已读状态，删除账号级联清理',async()=>{
+  await f.call('notify_author',`/api/reviews/${f.reviewId}/permanent`,'DELETE');
+  assert.equal((await list('notify_author')).data.items[0].reviewId,null);
+  migrateNotifications(f.db);assert.equal((await list('notify_author')).data.items.find(n=>n.id===id).readAt!==null,true);
+  for(let n=0;n<22;n++)f.db.prepare("INSERT INTO notifications(account_id,kind,course_name,reason,created_at) VALUES('notify_author','review.block','test','test',?)").run(new Date().toISOString());
+  const a=(await list('notify_author')).data,b=(await f.call('notify_author','/api/notifications?page=2')).data;
+  assert.equal(a.items.length,20);assert.equal(b.items.length,4);assert.ok(a.items.at(-1).id>b.items[0].id);
+  assert.equal((await f.call('notify_author','/api/notifications?page=-1')).status,400);
+  f.db.prepare('DELETE FROM account_members WHERE account_id=?').run('notify_author');f.db.prepare('DELETE FROM accounts WHERE user_id=?').run('notify_author');
+  assert.equal(f.db.prepare("SELECT COUNT(*) AS n FROM notifications WHERE account_id='notify_author'").get().n,0);
+  assert.equal(f.db.prepare('PRAGMA foreign_key_check').all().length,0);
+});

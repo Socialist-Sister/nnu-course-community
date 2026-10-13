@@ -3,16 +3,20 @@ import {loadEnvFile} from 'node:process';
 import {createMailer} from './mailer.mjs';
 import {emailDomains} from './email-verification.mjs';
 import {siteInfo} from './site-info.mjs';
-import { createReadStream, existsSync, statSync } from 'node:fs';
+import { createReadStream, existsSync, statSync, readFileSync } from 'node:fs';
 import { resolve, extname, sep, dirname } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { openDatabase, root,defaultDbPath } from './database.mjs';
 import { ApiError, metadata, listCourses, courseDetail } from './catalog.mjs';
 import {session,authorizeWrite,jsonBody,writeReview,withdrawReview,deleteReview,readReviews} from './reviews.mjs';
+import {writeHelpful} from './helpful.mjs';
 import {homeFeed} from './home.mjs';
 import {readBookmarks,writeBookmarks} from './bookmarks.mjs';
 import {currentPerson,requireAccount,requireVerified,accountAction,accountDeletionInfo,ensureAdminSetup} from './accounts.mjs';
 import {myReviews,reportReview,adminRead,adminWrite} from './community.mjs';
+import {readNotifications,unreadNotifications,markNotificationsRead} from './notifications.mjs';
+import {checkAdminAccess} from './admin-members.mjs';
+import {submitRevision,cancelRevision} from './review-revisions.mjs';
 export function createApp(db, { staticDir = resolve(root, 'dist/client'), mailer=createMailer() } = {}) {
   return createServer({ maxHeaderSize: 65536 }, async (req, res) => {
     res.setHeader('X-Content-Type-Options', 'nosniff');
@@ -20,8 +24,18 @@ export function createApp(db, { staticDir = resolve(root, 'dist/client'), mailer
     const json = (status, body) => { res.writeHead(status, { 'Content-Type':'application/json; charset=utf-8', 'Cache-Control':'no-store' }); res.end(JSON.stringify(body)); };
     try {
       const url = new URL(req.url, 'http://localhost');
+      if(url.pathname==='/admin/handbook'){
+        checkAdminAccess(db,currentPerson(db,req),'handbook');
+        if(!['GET','HEAD'].includes(req.method)){res.setHeader('Allow','GET, HEAD');return json(405,{error:'此接口不支持该操作'});}
+        const html=readFileSync(new URL('./data/admin-handbook.html',import.meta.url));
+        res.writeHead(200,{'Content-Type':'text/html; charset=utf-8','Cache-Control':'private, no-store','X-Robots-Tag':'noindex, nofollow','Content-Security-Policy':"default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'"});
+        return res.end(req.method==='HEAD'?undefined:html);
+      }
       if(req.method==='GET'&&url.pathname==='/api/site-info')return json(200,siteInfo());
       const accountWrite=()=>requireAccount(authorizeWrite(db,req));
+      if(url.pathname==='/api/notifications'&&req.method==='GET')return json(200,readNotifications(db,currentPerson(db,req),url.searchParams));
+      if(url.pathname==='/api/notifications/unread'&&req.method==='GET')return json(200,unreadNotifications(db,currentPerson(db,req)));
+      if(url.pathname==='/api/notifications/read'&&req.method==='POST')return json(200,markNotificationsRead(db,accountWrite(),await jsonBody(req)));
       if(url.pathname==='/api/bookmarks'){
         if(req.method==='GET')return json(200,readBookmarks(db,currentPerson(db,req)));
         if(req.method==='POST')return json(200,writeBookmarks(db,accountWrite(),await jsonBody(req,180000)));
@@ -39,6 +53,11 @@ export function createApp(db, { staticDir = resolve(root, 'dist/client'), mailer
         if(req.method==='GET')return json(200,adminRead(db,currentPerson(db,req),path,url.searchParams));
         if(req.method==='POST')return json(200,adminWrite(db,accountWrite(),path,await jsonBody(req)));
       }
+      const helpfulMatch=url.pathname.match(/^\/api\/reviews\/([a-zA-Z0-9-]+)\/helpful$/);
+      const revisionMatch=url.pathname.match(/^\/api\/reviews\/([a-zA-Z0-9-]+)\/revision$/);
+      if(revisionMatch&&req.method==='POST')return json(200,submitRevision(db,accountWrite(),revisionMatch[1],await jsonBody(req)));
+      if(revisionMatch&&req.method==='DELETE')return json(200,cancelRevision(db,accountWrite(),revisionMatch[1],await jsonBody(req)));
+      if(helpfulMatch&&req.method==='PUT')return json(200,writeHelpful(db,accountWrite(),helpfulMatch[1],await jsonBody(req)));
       const reportMatch=url.pathname.match(/^\/api\/reviews\/([a-zA-Z0-9-]+)\/report$/);
       if(reportMatch&&req.method==='POST')return json(201,reportReview(db,accountWrite(),reportMatch[1],await jsonBody(req)));
       const reviewMatch=url.pathname.match(/^\/api\/reviews\/([a-zA-Z0-9-]+)$/);
@@ -59,7 +78,7 @@ export function createApp(db, { staticDir = resolve(root, 'dist/client'), mailer
         if(feed){let code;try{code=decodeURIComponent(feed[1]);}catch{throw new ApiError(400,'课程编号无效');}return json(200,readReviews(db,req,code,url.searchParams));}
         if (url.pathname === '/api/health') return json(200, { status:'ok', database: db.prepare('SELECT COUNT(*) AS n FROM courses').get().n ? 'ready':'empty' });
         if (url.pathname === '/api/meta') return json(200, metadata(db));
-        if (url.pathname === '/api/home') return json(200, homeFeed(db));
+        if (url.pathname === '/api/home') return json(200, homeFeed(db,currentPerson(db,req)));
         if (url.pathname === '/api/courses') return json(200, listCourses(db, url.searchParams));
         const match = url.pathname.match(/^\/api\/courses\/([^/]+)$/);
         if (match) {
@@ -75,7 +94,7 @@ export function createApp(db, { staticDir = resolve(root, 'dist/client'), mailer
       if (file !== base && !file.startsWith(base + sep)) return json(403, {error:'路径无效'});
       const target = existsSync(file) && statSync(file).isFile() ? file : (!extname(pathname) ? resolve(base,'index.html') : null);
       if (!target || !existsSync(target)) return json(404, {error:'页面不存在，请先构建前端'});
-      const types = {'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.svg':'image/svg+xml','.png':'image/png','.ico':'image/x-icon'};
+      const types = {'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.svg':'image/svg+xml','.png':'image/png','.ico':'image/x-icon','.ttf':'font/ttf','.woff2':'font/woff2'};
       res.writeHead(200, {'Content-Type':types[extname(target)] || 'application/octet-stream', 'Cache-Control':extname(target)==='.html'?'no-cache':'public, max-age=3600'});
       if (req.method === 'HEAD') return res.end();
       createReadStream(target).on('error',()=>res.destroy()).pipe(res);

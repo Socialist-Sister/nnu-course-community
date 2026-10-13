@@ -1,0 +1,14 @@
+.review-helpful{display:flex;align-items:center;gap:6px 12px;flex-wrap:wrap;min-width:0}
+.review-helpful .review-helpful-button{display:inline-flex;align-items:center;gap:6px;padding:5px 8px;min-height:36px;border:1px solid transparent;border-radius:6px;color:var(--text-secondary);background:transparent;font-size:12px;line-height:1.4;white-space:nowrap}
+.review-helpful-button svg{flex-shrink:0}
+.review-helpful .review-helpful-button:hover:not(:disabled),.review-helpful .review-helpful-button:focus-visible,.review-helpful .review-helpful-button[aria-pressed=true]{color:var(--brand);background:var(--tint)}
+.review-helpful .review-helpful-button:focus-visible{border-color:var(--focus-border);outline:none;box-shadow:none}
+.review-helpful .review-helpful-button:disabled:not([aria-busy=true]){opacity:1;cursor:default;color:var(--muted)}
+.review-helpful-count{font-variant-numeric:tabular-nums}
+.review-helpful-error{font-size:12px;line-height:1.6;color:#924747;overflow-wrap:anywhere}
+.review-helpful-error a{text-decoration:underline}
+.student-review-footer{flex-wrap:wrap}
+.student-review-footer>.student-review-actions{display:flex;align-items:center;gap:6px 14px;flex-wrap:wrap}
+.student-review-actions>div:not(.review-helpful){display:flex;align-items:center;gap:15px}
+.student-review-actions>div:not(.review-helpful)>button{color:var(--text-secondary);padding:8px 0;font-size:12px}
+@media(max-width:480px){.review-helpful .review-helpful-button{min-height:40px}.student-review-footer>.student-review-actions{gap:6px 10px}}

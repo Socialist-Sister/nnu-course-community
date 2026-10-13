@@ -1,4 +1,8 @@
+import {readReports,readReportNotes,reportSummary,writeReport,guardReportReview} from './report-workflow.mjs';
 import {checkAdminAccess,readAdminMembers,writeAdminMember} from './admin-members.mjs';
+import {withHelpful} from './helpful.mjs';
+import {notify} from './notifications.mjs';
+import {latestRevision,readRevisions,decideRevision} from './review-revisions.mjs';
 import {randomUUID,timingSafeEqual} from 'node:crypto';
 import {ApiError,courseDetail,listCourses} from './catalog.mjs';
 import {ownedIds,requireAccount,requireAdmin,transaction,digest,rateLimit} from './accounts.mjs';
@@ -11,15 +15,16 @@ function audit(db,person,action,target,detail){db.prepare('INSERT INTO admin_aud
 export function myReviews(db,person,params){
   requireAccount(person);const ids=ownedIds(db,person),p=page(params),status=params.get('status')||'all';
   if(!['all','published','hidden','pending'].includes(status))throw new ApiError(400,'评价状态无效');
-  const where=`r.user_id IN(${slots(ids)})${status==='all'?'':' AND r.status=?'}`,args=status==='all'?ids:[...ids,status];
+  const review=params.get('review');
+  const where=`r.user_id IN(${slots(ids)})${status==='all'?'':' AND r.status=?'}${review?' AND r.id=?':''}`,args=[...ids,...(status==='all'?[]:[status]),...(review?[review]:[])];
   const total=db.prepare(`SELECT COUNT(*) AS n FROM reviews r WHERE ${where}`).get(...args).n;
   const items=db.prepare(`SELECT r.*,g.course_code,pm.page_id,c.name AS course_name,g.teachers_raw,t.label AS semester_label,m.reason AS moderation_reason,m.blocked,
     d.difficulty,d.workload,d.grading,d.gain FROM reviews r JOIN effective_groups g ON g.id=r.group_id JOIN effective_courses c ON c.code=g.course_code
     JOIN course_page_members pm ON pm.course_code=g.course_code LEFT JOIN review_terms t ON t.id=r.semester_id LEFT JOIN review_dimensions d ON d.review_id=r.id LEFT JOIN review_moderation m ON m.review_id=r.id
     WHERE ${where} ORDER BY r.created_at DESC,r.id DESC LIMIT 20 OFFSET ?`).all(...args,(p-1)*20).map(r=>({id:r.id,groupId:r.group_id,courseId:r.page_id,courseName:r.course_name,teacher:r.teachers_raw,
       semesterId:r.semester_id,semesterLabel:r.semester_label,rating:r.rating,content:r.content,status:r.status,createdAt:r.created_at,updatedAt:r.updated_at,
-      difficulty:r.difficulty,workload:r.workload,grading:r.grading,gain:r.gain,moderationReason:r.blocked?r.moderation_reason:null}));
-  return {items,total,page:p,totalPages:Math.ceil(total/20)};
+      difficulty:r.difficulty,workload:r.workload,grading:r.grading,gain:r.gain,moderationReason:r.blocked?r.moderation_reason:null,revision:latestRevision(db,r.id)}));
+  return {items:withHelpful(db,person,items),total,page:p,totalPages:Math.ceil(total/20)};
 }
 export function reportReview(db,person,id,data){
   requireAccount(person);const r=db.prepare("SELECT * FROM reviews WHERE id=? AND status='published'").get(id);
@@ -32,22 +37,20 @@ export function reportReview(db,person,id,data){
 export function adminRead(db,person,path,params){
   requireAdmin(person);checkAdminAccess(db,person,path);
   if(path==='members')return readAdminMembers(db,params);
+  if(path==='revisions')return readRevisions(db,params);
+  if(path==='revisions/summary')return {pending:db.prepare("SELECT COUNT(*) n FROM review_revisions WHERE status='pending'").get().n};
   if(path==='overview')return {openReports:db.prepare("SELECT COUNT(*) AS n FROM reports WHERE status='open'").get().n,accounts:db.prepare('SELECT COUNT(*) AS n FROM accounts').get().n,published:db.prepare("SELECT COUNT(*) AS n FROM reviews WHERE status='published'").get().n};
   const p=page(params),offset=(p-1)*20;
-  if(path==='reports'){
-    const status=params.get('status')||'open';if(!['open','resolved','dismissed'].includes(status))throw new ApiError(400,'举报状态无效');
-    const total=db.prepare('SELECT COUNT(*) AS n FROM reports WHERE status=?').get(status).n;
-    const items=db.prepare(`SELECT p.id,p.review_id AS reviewId,p.reason,p.status,p.resolution,p.created_at AS createdAt,r.content,r.status AS reviewStatus,c.name AS courseName,g.teachers_raw AS teacher
-      FROM reports p LEFT JOIN reviews r ON r.id=p.review_id LEFT JOIN effective_groups g ON g.id=r.group_id LEFT JOIN effective_courses c ON c.code=g.course_code WHERE p.status=? ORDER BY p.created_at DESC,p.id DESC LIMIT 20 OFFSET ?`).all(status,offset);
-    return {items,total,page:p,totalPages:Math.ceil(total/20)};
-  }
+  if(path==='reports')return readReports(db,person,params);
+  if(path==='reports/summary')return reportSummary(db,person);
+  if(/^reports\/[^/]+\/notes$/.test(path))return readReportNotes(db,path.split('/')[1],params);
   if(path==='reviews'){
     const q=(params.get('q')||'').trim();if(q.length>100)throw new ApiError(400,'搜索词过长');
     const status=params.get('status')||'all';if(!['all','published','hidden','pending'].includes(status))throw new ApiError(400,'评价状态无效');
     const where="(instr(r.content,?)>0 OR instr(c.name,?)>0 OR instr(g.course_code,?)>0)"+(status==='all'?'':' AND r.status=?'),args=[q,q,q,...(status==='all'?[]:[status])];
     const from='FROM reviews r JOIN effective_groups g ON g.id=r.group_id JOIN effective_courses c ON c.code=g.course_code';
     const total=db.prepare(`SELECT COUNT(*) AS n ${from} WHERE ${where}`).get(...args).n;
-    const items=db.prepare(`SELECT r.id,r.content,r.rating,r.status,r.created_at AS createdAt,c.name AS courseName,g.teachers_raw AS teacher,m.blocked,m.reason ${from} LEFT JOIN review_moderation m ON m.review_id=r.id WHERE ${where} ORDER BY r.created_at DESC,r.id DESC LIMIT 20 OFFSET ?`).all(...args,offset);
+    const items=db.prepare(`SELECT r.id,r.content,r.rating,r.status,r.created_at AS createdAt,c.name AS courseName,g.teachers_raw AS teacher,m.blocked,m.reason,EXISTS(SELECT 1 FROM review_revisions v WHERE v.review_id=r.id AND v.status='pending') AS pendingRevision ${from} LEFT JOIN review_moderation m ON m.review_id=r.id WHERE ${where} ORDER BY r.created_at DESC,r.id DESC LIMIT 20 OFFSET ?`).all(...args,offset);
     return {items,total,page:p,totalPages:Math.ceil(total/20)};
   }
   if(path==='courses'){
@@ -78,21 +81,25 @@ export function adminWrite(db,person,path,data){
     transaction(db,()=>{db.prepare("UPDATE accounts SET role='admin' WHERE user_id=?").run(person.userId);db.prepare('INSERT INTO site_owner VALUES(1,?)').run(person.userId);db.exec('DELETE FROM admin_setup');audit(db,person,'admin.setup',person.userId,{});});return {ok:true};
   }
   requireAdmin(person);checkAdminAccess(db,person,path);
+  if(/^revisions\/\d+$/.test(path))return decideRevision(db,person,Number(path.split('/')[1]),data);
   if(path.startsWith('reviews/')){
     const id=path.slice(8),r=db.prepare('SELECT * FROM reviews WHERE id=?').get(id);if(!r)throw new ApiError(404,'评价不存在');
     if(!['block','restore'].includes(data.action))throw new ApiError(400,'管理操作无效');const reason=text(data.reason,'处理说明');
     transaction(db,()=>{
+      if(data.reportId)guardReportReview(db,person,data.reportId,id,data.reportVersion);
+      if(db.prepare("SELECT 1 FROM review_revisions WHERE review_id=? AND status='pending'").get(id))throw new ApiError(409,'该评价有待复核申请，请到“评价复核”处理');
+      const wasBlocked=!!db.prepare('SELECT blocked FROM review_moderation WHERE review_id=?').get(id)?.blocked;
       db.prepare('INSERT INTO review_moderation VALUES(?,?,?,?) ON CONFLICT(review_id) DO UPDATE SET blocked=excluded.blocked,reason=excluded.reason,updated_at=excluded.updated_at').run(id,Number(data.action==='block'),reason,now());
       if(data.action==='block')db.prepare("UPDATE reviews SET status='pending' WHERE id=? AND status='published'").run(id);
       else db.prepare("UPDATE reviews SET status='published' WHERE id=? AND status='pending'").run(id);
       audit(db,person,'review.'+data.action,id,{reason,previousStatus:r.status});
+      if(wasBlocked!==(data.action==='block')){
+        const owner=db.prepare('SELECT account_id FROM account_members WHERE user_id=?').get(r.user_id)?.account_id;
+        notify(db,owner,'review.'+data.action,id,reason);
+      }
     });return {ok:true};
   }
-  if(path.startsWith('reports/')){
-    const id=path.slice(8);if(!db.prepare('SELECT 1 FROM reports WHERE id=?').get(id))throw new ApiError(404,'举报不存在');
-    if(!['resolved','dismissed'].includes(data.status))throw new ApiError(400,'处理结果无效');const resolution=text(data.resolution,'处理说明');
-    transaction(db,()=>{db.prepare('UPDATE reports SET status=?,resolution=?,updated_at=? WHERE id=?').run(data.status,resolution,now(),id);audit(db,person,'report.'+data.status,id,{resolution});});return {ok:true};
-  }
+  if(path.startsWith('reports/')){const [,id,operation]=path.split('/');return writeReport(db,person,id,operation||'resolve',data);}
   if(path.startsWith('courses/')){
     const code=decodeURIComponent(path.slice(8)),original=db.prepare('SELECT * FROM courses WHERE code=?').get(code);if(!original)throw new ApiError(404,'课程不存在');
     if(data.reset===true){

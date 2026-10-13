@@ -8,13 +8,13 @@ export function Home({meta,metaError,onMetaRetry,onOpen}){
   const input=useRef(null),composing=useRef(false);
   useEffect(()=>{const c=new AbortController();setError('');fetch('/api/home',{signal:AbortSignal.any([c.signal,AbortSignal.timeout(15000)])}).then(async r=>{if(!r.ok)throw Error('暂时无法加载最新评价');return r.json();}).then(setFeed).catch(()=>{if(!c.signal.aborted)setError('暂时无法加载最新评价');});return()=>c.abort();},[retry]);
   useEffect(()=>{const key=e=>{if(e.key==='/'&&!document.querySelector('dialog[open]')&&!['INPUT','TEXTAREA','SELECT'].includes(e.target.tagName)&&!e.target.isContentEditable){e.preventDefault();input.current?.focus();}};window.addEventListener('keydown',key);return()=>window.removeEventListener('keydown',key);},[]);
+  useEffect(()=>{const refresh=()=>{if(document.visibilityState==='visible')setRetry(v=>v+1);};window.addEventListener('focus',refresh);return()=>window.removeEventListener('focus',refresh);},[]);
   function link(e,options){if(e.button!==0||e.metaKey||e.ctrlKey||e.shiftKey||e.altKey)return;e.preventDefault();onOpen(options);}
   const categories=meta?.commonCategories||[];
   return <main className="home-page" id="home-content" tabIndex={-1}><div className="home-container">
     <section className="home-search-section" aria-labelledby="home-title"><div className="home-intro"><span className="home-eyebrow">南京师范大学 · 同学的选课经验</span><h1 id="home-title">选课之前，<br className="home-title-break"/>听听同学怎么说。</h1></div>
       <form className="home-search" role="search" onSubmit={e=>{e.preventDefault();if(!composing.current)onOpen({q:query.trim()});}}><MagnifyingGlass size={24} aria-hidden="true"/><input ref={input} aria-label="主页搜索课程或教师" aria-describedby="home-search-help" placeholder="课程号 / 课程名 / 教师姓名" maxLength={100} value={query} onChange={e=>setQuery(e.target.value)} onCompositionStart={()=>{composing.current=true;}} onCompositionEnd={()=>{composing.current=false;}}/><button type="submit">搜索 <ArrowRight size={18}/></button></form>
       <div className="home-search-bottom"><p id="home-search-help">支持“高数”“大物”等简称，多个关键词用空格分隔</p><a href="/courses" onClick={e=>link(e,{})}>浏览课程库 <ArrowUpRight size={14}/></a></div>
-      <div className="home-shortcuts" aria-label="公共课"><span>常用课程</span>{categories.filter(c=>c.kind==='course').map(c=><a key={c.id} href={`/courses?topic=${c.id}`} onClick={e=>link(e,{topic:c.id})}>{c.name}{c.status==='not-collected'&&<small>待补录</small>}</a>)}</div>
       {metaError&&<p className="inline-error" role="alert">分类加载失败 <button onClick={onMetaRetry}>重试</button></p>}
     </section>
     <div className="home-columns"><section className="home-latest" aria-labelledby="home-latest-title"><div className="home-section-heading"><h2 id="home-latest-title">最新评价</h2><span>按发布时间</span></div>

@@ -18,6 +18,9 @@ local-backups/
 *.db-*
 *.pem
 *.key
+*.dpapi
+*.nnu-backup
+.recovery-kit-*/
 *setup-code.txt
 *.tar.gz
 *.zip
@@ -27,6 +30,8 @@ local-backups/
 /*.md
 !/README.md
 !/CONTRIBUTING.md
+!/ADMIN-HANDBOOK.md
+/server/data/admin-handbook.html
 /deploy/diagnose-mail.mjs
 
 __pycache__/

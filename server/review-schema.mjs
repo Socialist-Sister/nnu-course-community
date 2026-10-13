@@ -29,11 +29,17 @@ export function migrateReviews(db){
     gain INTEGER CHECK(gain BETWEEN 1 AND 5)
   ) STRICT;
   INSERT OR IGNORE INTO schema_migrations VALUES(5,strftime('%Y-%m-%dT%H:%M:%fZ','now'));`);
+  // Imported catalog labels can omit spaces; keep review study-term display consistent.
+  const updateTermLabel=db.prepare('UPDATE review_terms SET label=? WHERE id=? AND label!=?');
+  for(const {id} of db.prepare('SELECT id FROM review_terms').all()){
+    const match=/^(\d{4})-(\d{4})-([12])$/.exec(id);
+    if(match){const label=`${match[1]}–${match[2]} 学年第 ${match[3]} 学期`;updateTermLabel.run(label,id,label);}
+  }
 }
 export function studyTerms(db,now=new Date()){
   const parts=Object.fromEntries(new Intl.DateTimeFormat('en',{timeZone:'Asia/Shanghai',year:'numeric',month:'numeric'}).formatToParts(now).map(p=>[p.type,p.value]));
   const year=Number(parts.year),month=Number(parts.month),start=month>=9?year:year-1,term=month>=2&&month<=8?2:1;
   const items=[];for(let y=start;y>=start-7;y--)for(const n of [2,1]){if(y===start&&n>term)continue;items.push({id:`${y}-${y+1}-${n}`,label:`${y}–${y+1} 学年第 ${n} 学期`});}
-  const insert=db.prepare('INSERT OR IGNORE INTO review_terms VALUES(?,?)');for(const t of items)insert.run(t.id,t.label);
+  const insert=db.prepare('INSERT INTO review_terms VALUES(?,?) ON CONFLICT(id) DO UPDATE SET label=excluded.label WHERE label!=excluded.label');for(const t of items)insert.run(t.id,t.label);
   return items;
 }

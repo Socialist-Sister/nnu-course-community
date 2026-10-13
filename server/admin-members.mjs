@@ -27,7 +27,8 @@ export function checkAdminAccess(db,person,path){
   if(db.prepare('SELECT role FROM accounts WHERE user_id=?').get(person.account.id)?.role!=='admin')throw new ApiError(403,'需要管理员权限');
   const a=adminAccess(db,person.account.id),area=path.split('/')[0];
   if(a.isOwner)return;
-  if((['reviews','reports'].includes(area)&&a.permissions.content)||(area==='courses'&&a.permissions.courses))return;
+  if(path==='handbook'&&(a.permissions.content||a.permissions.courses))return;
+  if((['reviews','reports','revisions'].includes(area)&&a.permissions.content)||(area==='courses'&&a.permissions.courses))return;
   throw new ApiError(403,'没有此项管理权限');
 }
 function publicMember(db,a){return {id:a.user_id,username:a.username,...adminAccess(db,a.user_id),grantedAt:a.granted_at||a.created_at,emailVerified:!!a.email_verified_at};}
